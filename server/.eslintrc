@@ -1,0 +1,20 @@
+{
+  "extends": "airbnb/base",
+  "parser": "babel-eslint",
+  "env": {
+    "es6": true,
+    "browser": true
+  },
+  "rules": {
+    "no-use-before-define": "off",
+    "no-console": "off",
+    "func-names": "off",
+    "no-underscore-dangle": "off",
+    "no-restricted-syntax": "off",
+    "no-continue": "off",
+    "no-param-reassign": "off",
+    "arrow-parens": "off",
+    "no-await-in-loop": "off",
+    "object-curly-newline": "off"
+  }
+}

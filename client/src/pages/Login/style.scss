@@ -1,0 +1,21 @@
+.login-page {
+  min-height: 100vh;
+  padding-top: 80px;
+  .card {
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: 0 0.5rem 1rem 0 rgba(0, 0, 0, 0.1);
+  }
+  input, button {
+    line-height: 1.5;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-radius: 2rem;
+    height: auto;
+    text-align: center;
+  }
+
+  button {
+    font-weight: bold;
+  }
+}
