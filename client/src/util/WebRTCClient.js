@@ -64,13 +64,13 @@ export default class PeerClient extends EventEmitter {
 
   getCameraStream = async () => {
     try {
-      if (!this.cameraStream) {
-        this.cameraStream = await getUserMedia();
-        this.cameraStream.name = 'camera';
+      if (!this.localCameraStream) {
+        this.localCameraStream = await getUserMedia();
+        this.localCameraStream.name = 'camera';
         this.emit('ready');
-        this.emit('local-camera-stream', this.cameraStream);
+        this.emit('local-camera-stream', this.localCameraStream);
       }
-      return this.cameraStream;
+      return this.localCameraStream;
     } catch (error) {
       console.log(error);
       this.emit('error', 'Can not access camera');
@@ -102,10 +102,10 @@ export default class PeerClient extends EventEmitter {
 
     this.peer.on('connect', async () => {
       this.emit('connect');
-      if (this.cameraStream) {
-        this.peer.addStream(this.cameraStream);
-        if (this.screenStream) {
-          this.peer.addStream(this.screenStream);
+      if (this.localCameraStream) {
+        this.peer.addStream(this.localCameraStream);
+        if (this.localScreenStream) {
+          this.peer.addStream(this.localScreenStream);
         }
       }
     });
@@ -137,14 +137,14 @@ export default class PeerClient extends EventEmitter {
   }
 
   mute = (enabled) => {
-    const audioTrack = this.cameraStream.getAudioTracks()[0];
+    const audioTrack = this.localCameraStream.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = enabled;
     }
   }
 
   enableVideo = (enabled) => {
-    const videoTrack = this.cameraStream.getVideoTracks()[0];
+    const videoTrack = this.localCameraStream.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.enabled = enabled;
     }
@@ -152,22 +152,22 @@ export default class PeerClient extends EventEmitter {
 
   toggleShareScreen = async () => {
     try {
-      if (this.screenStream) {
-        this.screenStream.getTracks().forEach((x) => x.stop());
+      if (this.localScreenStream) {
+        this.localScreenStream.getTracks().forEach((x) => x.stop());
         this.emit('local-screen-stream-ended');
         this.send('remote-screen-stream-ended');
-        this.screenStream = null;
+        this.localScreenStream = null;
       } else {
-        const screenStream = await getDisplayMedia();
-        this.screenStream = screenStream;
-        screenStream.getTracks()[0].addEventListener('ended', () => {
-          this.screenStream = null;
+        const localScreenStream = await getDisplayMedia();
+        this.localScreenStream = localScreenStream;
+        localScreenStream.getTracks()[0].addEventListener('ended', () => {
+          this.localScreenStream = null;
           this.emit('local-screen-stream-ended');
           this.send('remote-screen-stream-ended');
         });
-        this.emit('local-screen-stream', screenStream);
+        this.emit('local-screen-stream', localScreenStream);
         if (this.peer) {
-          this.peer.addStream(screenStream);
+          this.peer.addStream(localScreenStream);
         }
       }
     } catch (error) {
@@ -179,7 +179,7 @@ export default class PeerClient extends EventEmitter {
   requestRecordScreenStream = async () => {
     try {
       const recordScreenStream = await getDisplayMedia();
-      recordScreenStream.addTrack(this.cameraStream.getAudioTracks()[0]);
+      recordScreenStream.addTrack(this.localCameraStream.getAudioTracks()[0]);
       this.recordScreenStream = recordScreenStream;
       return recordScreenStream;
     } catch (error) {
