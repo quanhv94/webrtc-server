@@ -3,11 +3,14 @@ import React from 'react';
 import { Button } from 'reactstrap';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
+import { RecordRTCPromisesHandler, invokeSaveAsDialog } from 'recordrtc';
 import { toast } from 'react-toastify';
+import { confirmAlert } from 'react-confirm-alert';
 import Controls from './Controls';
 import socket from '../../socket';
 import './style.scss';
 import PeerClient from '../../util/WebRTCClient';
+import RecordTimer from './RecordTimer';
 
 export default class Home extends React.Component {
   static propTypes = {
@@ -24,6 +27,7 @@ export default class Home extends React.Component {
       microphoneOn: true,
       cameraOn: true,
       shareScreenOn: false,
+      recordOn: false,
       username,
       room,
       error: '',
@@ -150,6 +154,44 @@ export default class Home extends React.Component {
     this.peerClient.toggleShareScreen();
   }
 
+  toggleRecord = async () => {
+    const { recordOn } = this.state;
+    if (!recordOn) {
+      confirmAlert({
+        title: 'Screen record confirm',
+        message: 'Do you really want to record your screen. You need to save before record again each 30 minutes.',
+        buttons: [
+          {
+            label: 'OK',
+            onClick: async () => {
+              const screenStream = await this.peerClient.requestRecordScreenStream();
+              if (!screenStream) return;
+              this.setState({ recordOn: true });
+              screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+                this.toggleRecord();
+              });
+              this.recorder = new RecordRTCPromisesHandler(screenStream, {
+                type: 'video',
+                disableLogs: true,
+              });
+              this.recorder.startRecording();
+            },
+          },
+          {
+            label: 'Cancel',
+          },
+        ],
+      });
+    } else {
+      this.setState({ recordOn: false });
+      await this.recorder.stopRecording();
+      const blob = await this.recorder.getBlob();
+      invokeSaveAsDialog(blob);
+      this.recorder.destroy();
+      this.peerClient.removeRecordScreenStream();
+    }
+  }
+
   render() {
     const {
       hasCameraPermission,
@@ -157,6 +199,7 @@ export default class Home extends React.Component {
       microphoneOn,
       cameraOn,
       shareScreenOn,
+      recordOn,
       error,
       peers,
     } = this.state;
@@ -187,20 +230,23 @@ export default class Home extends React.Component {
             microphoneOn={microphoneOn}
             cameraOn={cameraOn}
             shareScreenOn={shareScreenOn}
-            toggleMicrophone={this.toggleMicrophone}
-            toggleCamera={this.toggleCamera}
-            toggleShareScreen={this.toggleShareScreen}
+            recordOn={recordOn}
+            onClickMicrophone={this.toggleMicrophone}
+            onClickCamera={this.toggleCamera}
+            onClickShareScreen={this.toggleShareScreen}
+            onClickRecord={this.toggleRecord}
           />
-          <div className={classnames('error', { 'd-none': !error })}>
-            <h3>{error}</h3>
-          </div>
-          <div className={classnames('watting-camera-permission', { 'd-none': hasCameraPermission })}>
-            <h4>Đang truy cập camera</h4>
-          </div>
-          <div className={classnames('watting-message', { 'd-none': Object.keys(peers).length >= 2 })}>
-            <p>Vui lòng chờ nguời dùng khác tham gia</p>
-          </div>
         </div>
+        <div className={classnames('error', { 'd-none': !error })}>
+          <h3>{error}</h3>
+        </div>
+        <div className={classnames('watting-camera-permission', { 'd-none': hasCameraPermission })}>
+          <h4>Accessing camera</h4>
+        </div>
+        <div className={classnames('watting-message', { 'd-none': Object.keys(peers).length >= 2 })}>
+          <p>Please wait for your partner</p>
+        </div>
+        {recordOn && <RecordTimer timeout={60 * 30} onTimeout={this.toggleRecord} />}
       </div>
     );
   }

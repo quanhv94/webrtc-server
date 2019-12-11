@@ -7,15 +7,19 @@ const Controls = ({
   microphoneOn,
   cameraOn,
   shareScreenOn,
-  toggleMicrophone,
-  toggleCamera,
-  toggleShareScreen,
-}) => (
+  recordOn,
+  onClickMicrophone,
+  onClickCamera,
+  onClickShareScreen,
+  onClickRecord,
+  // eslint-disable-next-line arrow-body-style
+}) => {
+  return (
     <div className="control-wrapper">
       <Button
         color="transparent"
         className={classnames({ active: microphoneOn })}
-        onClick={toggleMicrophone}
+        onClick={onClickMicrophone}
       >
         <i className="icon-microphone" />
         <div className="small">Mic</div>
@@ -23,7 +27,7 @@ const Controls = ({
       <Button
         color="transparent"
         className={classnames({ active: cameraOn })}
-        onClick={toggleCamera}
+        onClick={onClickCamera}
       >
         <i className="icon-camrecorder" />
         <div className="small">Cam</div>
@@ -31,21 +35,32 @@ const Controls = ({
       <Button
         color="transparent"
         className={classnames({ active: shareScreenOn })}
-        onClick={toggleShareScreen}
+        onClick={onClickShareScreen}
       >
         <i className="icon-screen-desktop" />
         <div className="small">Share</div>
       </Button>
+      <Button
+        color="transparent"
+        className={classnames({ active: recordOn })}
+        onClick={onClickRecord}
+      >
+        <i className="fa fa-dot-circle-o" />
+        <div className="small">Rec</div>
+      </Button>
     </div>
   );
+};
 
 Controls.propTypes = {
   microphoneOn: PropTypes.bool.isRequired,
   cameraOn: PropTypes.bool.isRequired,
   shareScreenOn: PropTypes.bool.isRequired,
-  toggleMicrophone: PropTypes.func.isRequired,
-  toggleCamera: PropTypes.func.isRequired,
-  toggleShareScreen: PropTypes.func.isRequired,
+  recordOn: PropTypes.bool.isRequired,
+  onClickMicrophone: PropTypes.func.isRequired,
+  onClickCamera: PropTypes.func.isRequired,
+  onClickShareScreen: PropTypes.func.isRequired,
+  onClickRecord: PropTypes.func.isRequired,
 };
 
 export default Controls;

@@ -2,6 +2,34 @@ import Peer from 'simple-peer';
 import EventEmitter from 'eventemitter3';
 import socket from '../socket/index';
 
+const iceServers = [
+  {
+    url: 'turn:numb.viagenie.ca',
+    credential: 'muazkh',
+    username: 'webrtc@live.com',
+  },
+  {
+    url: 'turn:192.158.29.39:3478?transport=udp',
+    credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+    username: '28224511:1379330808',
+  },
+  {
+    url: 'turn:192.158.29.39:3478?transport=tcp',
+    credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+    username: '28224511:1379330808',
+  },
+  {
+    url: 'turn:turn.bistri.com:80',
+    credential: 'homeo',
+    username: 'homeo',
+  },
+  {
+    url: 'turn:turn.anyfirewall.com:443?transport=tcp',
+    credential: 'webrtc',
+    username: 'webrtc',
+  },
+];
+
 /**
  * @returns { Promise<MediaStream>}
  */
@@ -44,6 +72,7 @@ export default class PeerClient extends EventEmitter {
       }
       return this.cameraStream;
     } catch (error) {
+      console.log(error);
       this.emit('error', 'Can not access camera');
       return null;
     }
@@ -60,33 +89,7 @@ export default class PeerClient extends EventEmitter {
     this.peer = new Peer({
       initiator,
       config: {
-        iceServers: [
-          {
-            url: 'turn:numb.viagenie.ca',
-            credential: 'muazkh',
-            username: 'webrtc@live.com',
-          },
-          {
-            url: 'turn:192.158.29.39:3478?transport=udp',
-            credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-            username: '28224511:1379330808',
-          },
-          {
-            url: 'turn:192.158.29.39:3478?transport=tcp',
-            credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-            username: '28224511:1379330808',
-          },
-          {
-            url: 'turn:turn.bistri.com:80',
-            credential: 'homeo',
-            username: 'homeo',
-          },
-          {
-            url: 'turn:turn.anyfirewall.com:443?transport=tcp',
-            credential: 'webrtc',
-            username: 'webrtc',
-          },
-        ],
+        iceServers,
       },
     });
     this.peer.on('signal', (signal) => {
@@ -128,7 +131,9 @@ export default class PeerClient extends EventEmitter {
   }
 
   send = (data) => {
-    this.peer.send(data);
+    if (this.peer) {
+      this.peer.send(data);
+    }
   }
 
   mute = (enabled) => {
@@ -150,7 +155,7 @@ export default class PeerClient extends EventEmitter {
       if (this.screenStream) {
         this.screenStream.getTracks().forEach((x) => x.stop());
         this.emit('local-screen-stream-ended');
-        this.peer.send('remote-screen-stream-ended');
+        this.send('remote-screen-stream-ended');
         this.screenStream = null;
       } else {
         const screenStream = await getDisplayMedia();
@@ -158,7 +163,7 @@ export default class PeerClient extends EventEmitter {
         screenStream.getTracks()[0].addEventListener('ended', () => {
           this.screenStream = null;
           this.emit('local-screen-stream-ended');
-          this.peer.send('remote-screen-stream-ended');
+          this.send('remote-screen-stream-ended');
         });
         this.emit('local-screen-stream', screenStream);
         if (this.peer) {
@@ -166,7 +171,28 @@ export default class PeerClient extends EventEmitter {
         }
       }
     } catch (error) {
+      console.log(error);
       this.emit('error', 'Can not access display');
+    }
+  }
+
+  requestRecordScreenStream = async () => {
+    try {
+      const recordScreenStream = await getDisplayMedia();
+      recordScreenStream.addTrack(this.cameraStream.getAudioTracks()[0]);
+      this.recordScreenStream = recordScreenStream;
+      return recordScreenStream;
+    } catch (error) {
+      console.log(error);
+      this.emit('error', 'Can not access display');
+      return null;
+    }
+  }
+
+  removeRecordScreenStream = () => {
+    if (this.recordScreenStream) {
+      this.recordScreenStream.getTracks().forEach((x) => x.stop());
+      this.recordScreenStream = null;
     }
   }
 
