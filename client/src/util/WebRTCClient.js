@@ -62,7 +62,7 @@ export default class PeerClient extends EventEmitter {
       config: {
         iceServers: [
           {
-            urls: 'stun.l.google.com:19302',
+            urls: 'stun:stun.l.google.com:19302',
           },
           {
             url: 'turn:numb.viagenie.ca',
