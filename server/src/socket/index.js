@@ -1,24 +1,34 @@
 import socketIO from 'socket.io';
+import request from 'request-promise';
 
 const rooms = {};
 
 const setupSocket = (server) => {
   const io = socketIO(server);
   io.on('connection', (socket) => {
-    socket.on('join', ({ room, username }) => {
+    socket.on('join', async ({ room, username }) => {
       rooms[room] = rooms[room] || {};
+      const response = await request({
+        uri: `http://test.e-school.rabita.vn:80/api/v1/meeting-room/room-data?roomCode=${room}&userId=${username}`,
+        json: true,
+      });
+      if (!response.data.success) {
+        socket.emit('join-error', response.data.message);
+        return;
+      }
+      const { user } = response.data.data;
       if (rooms[room][username]) {
-        socket.emit('join-error', 'Bạn đang đăng nhập tại một trình duyệt khác');
+        socket.emit('join-error', 'You logged in at another browser');
       } else if (Object.keys(rooms[room]).length >= 2) {
-        socket.emit('join-error', 'Phòng này đã đầy');
+        socket.emit('join-error', 'This room is full');
       } else {
         socket.room = room;
         socket.username = username;
         socket.join(room);
         rooms[room][username] = socket.id;
         io.in(room).emit('peers', rooms[room]);
-        socket.send({ type: 'success', content: `Xin chào ${username}` });
-        socket.to(room).broadcast.send({ type: 'success', content: `${username} vừa vào phòng` });
+        socket.send({ type: 'success', content: `Hello ${user.full_name}` });
+        socket.to(room).broadcast.send({ type: 'success', content: `${user.full_name} joined` });
         if (Object.keys(rooms[room]).length === 2) {
           io.in(socket.room).emit('start-call', username);
         }
