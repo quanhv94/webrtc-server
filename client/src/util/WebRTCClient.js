@@ -62,9 +62,6 @@ export default class PeerClient extends EventEmitter {
       config: {
         iceServers: [
           {
-            urls: 'stun:stun.l.google.com:19302',
-          },
-          {
             url: 'turn:numb.viagenie.ca',
             credential: 'muazkh',
             username: 'webrtc@live.com',
