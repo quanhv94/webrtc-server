@@ -135,7 +135,6 @@ export default class PeerClient extends EventEmitter {
         }
       }
     } catch (error) {
-      console.log(error);
       this.emit('error', 'Can not access display');
     }
   }
