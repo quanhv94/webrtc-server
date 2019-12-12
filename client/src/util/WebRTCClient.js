@@ -54,10 +54,10 @@ const getDisplayMedia = () => {
 };
 
 export default class PeerClient extends EventEmitter {
-  constructor({ room, username }) {
+  constructor({ roomCode, userId }) {
     super();
-    this.room = room;
-    this.username = username;
+    this.roomCode = roomCode;
+    this.userId = userId;
     socket.addEventListener('rtc-signal', this.handleSignaling);
     this.getCameraStream();
   }
@@ -79,7 +79,7 @@ export default class PeerClient extends EventEmitter {
   }
 
   handleSignaling = (data) => {
-    if (data.room === this.room && data.from !== this.username) {
+    if (data.roomCode === this.roomCode && data.from !== this.userId) {
       this.peer.signal(data.signal);
     }
   }
@@ -94,8 +94,8 @@ export default class PeerClient extends EventEmitter {
     });
     this.peer.on('signal', (signal) => {
       socket.emit('rtc-signal', {
-        room: this.room,
-        from: this.username,
+        roomCode: this.roomCode,
+        from: this.userId,
         signal,
       });
     });

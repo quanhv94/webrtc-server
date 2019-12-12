@@ -12,8 +12,8 @@ export default class Login extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      room: 'room1',
-      username: faker.name.firstName().toLocaleLowerCase(),
+      roomCode: 'roomCode1',
+      userId: faker.name.firstName().toLocaleLowerCase(),
     };
   }
 
@@ -25,13 +25,13 @@ export default class Login extends React.Component {
 
   onSubmit = (e) => {
     e.preventDefault();
-    const { room, username } = this.state;
+    const { roomCode, userId } = this.state;
     const { history } = this.props;
-    history.push(`/${room}/${username}`);
+    history.push(`/${roomCode}/${userId}`);
   }
 
   render() {
-    const { room, username } = this.state;
+    const { roomCode, userId } = this.state;
     return (
       <div className="login-page">
         <Container>
@@ -44,22 +44,22 @@ export default class Login extends React.Component {
                 <Form onSubmit={this.onSubmit}>
                   <FormGroup>
                     <Input
-                      name="room"
-                      value={room}
+                      name="roomCode"
+                      value={roomCode}
                       placeholder="Phòng"
                       onChange={this.onChange}
                     />
                   </FormGroup>
                   <FormGroup>
                     <Input
-                      name="username"
-                      value={username}
+                      name="userId"
+                      value={userId}
                       placeholder="Tên đăng nhập"
                       onChange={this.onChange}
                     />
                   </FormGroup>
                   <FormGroup>
-                    <Button color="primary" block disabled={!username || !room}>THAM GIA</Button>
+                    <Button color="primary" block disabled={!userId || !roomCode}>THAM GIA</Button>
                   </FormGroup>
                 </Form>
               </Card>

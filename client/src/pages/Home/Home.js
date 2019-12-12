@@ -20,7 +20,7 @@ export default class Home extends React.Component {
   constructor(props) {
     super(props);
     const { match } = props;
-    const { username, room } = match.params;
+    const { userId, roomCode } = match.params;
     this.state = {
       hasCameraPermission: false,
       screenFull: 0,
@@ -28,18 +28,18 @@ export default class Home extends React.Component {
       cameraOn: true,
       shareScreenOn: false,
       recordOn: false,
-      username,
-      room,
+      userId,
+      roomCode,
       error: '',
       peers: {},
     };
   }
 
   componentDidMount() {
-    const { room, username } = this.state;
-    this.createPeerClient({ room, username }).on('ready', () => {
+    const { roomCode, userId } = this.state;
+    this.createPeerClient({ roomCode, userId }).on('ready', () => {
       this.setState({ hasCameraPermission: true });
-      socket.emit('join', { room, username });
+      socket.emit('join', { roomCode, userId });
       socket.addEventListener('message', this.showMessage);
       socket.addEventListener('peers', this.handlePeers);
       socket.addEventListener('join-error', this.handleError);
@@ -56,8 +56,8 @@ export default class Home extends React.Component {
     socket.removeEventListener('start-call', this.startCall);
   }
 
-  createPeerClient = ({ room, username }) => {
-    this.peerClient = new PeerClient({ room, username });
+  createPeerClient = ({ roomCode, userId }) => {
+    this.peerClient = new PeerClient({ roomCode, userId });
     this.peerClient.on('local-camera-stream', (stream) => {
       const video = document.querySelector('#localVideo1');
       video.srcObject = stream;
@@ -132,8 +132,8 @@ export default class Home extends React.Component {
   }
 
   startCall = (caller) => {
-    const { username } = this.state;
-    this.peerClient.startCall({ initiator: caller === username });
+    const { userId } = this.state;
+    this.peerClient.startCall({ initiator: caller === userId });
   }
 
   toggleMicrophone = () => {

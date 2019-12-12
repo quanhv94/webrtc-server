@@ -1,54 +1,75 @@
 import socketIO from 'socket.io';
 import request from 'request-promise';
 
+const checkRoom = async ({ roomCode, userId }) => {
+  if (roomCode === 'roomCode1') {
+    return {
+      room: {},
+      user: { full_name: userId },
+    };
+  }
+  try {
+    const response = await request({
+      uri: `http://test.e-school.rabita.vn:80/api/v1/meeting-room/room-data?roomCode=${roomCode}&userId=${userId}`,
+      json: true,
+    });
+    const { data } = response;
+    if (!data.success) {
+      const { message } = data;
+      return { error: message };
+    }
+    const { user, room } = data.data;
+    return { user, room };
+  } catch {
+    return { error: 'Can not connect to server' };
+  }
+};
+
 const rooms = {};
 
 const setupSocket = (server) => {
   const io = socketIO(server);
   io.on('connection', (socket) => {
-    socket.on('join', async ({ room, username }) => {
-      rooms[room] = rooms[room] || {};
-      const response = await request({
-        uri: `http://test.e-school.rabita.vn:80/api/v1/meeting-room/room-data?roomCode=${room}&userId=${username}`,
-        json: true,
-      });
-      if (!response.data.success) {
-        socket.emit('join-error', response.data.message);
+    socket.on('join', async ({ roomCode, userId }) => {
+      rooms[roomCode] = rooms[roomCode] || {};
+      const { user, error } = await checkRoom({ roomCode, userId });
+      if (error) {
+        socket.emit('join-error', error);
         return;
       }
-      const { user } = response.data.data;
-      if (rooms[room][username]) {
+
+      if (rooms[roomCode][userId]) {
         socket.emit('join-error', 'You logged in at another browser');
-      } else if (Object.keys(rooms[room]).length >= 2) {
+      } else if (Object.keys(rooms[roomCode]).length >= 2) {
         socket.emit('join-error', 'This room is full');
       } else {
-        socket.room = room;
-        socket.username = username;
-        socket.join(room);
-        rooms[room][username] = socket.id;
-        io.in(room).emit('peers', rooms[room]);
+        socket.roomCode = roomCode;
+        socket.userId = userId;
+        socket.join(roomCode);
+        rooms[roomCode][userId] = socket.id;
+        io.in(roomCode).emit('peers', rooms[roomCode]);
         socket.send({ type: 'success', content: `Hello ${user.full_name}` });
-        socket.to(room).broadcast.send({ type: 'success', content: `${user.full_name} joined` });
-        if (Object.keys(rooms[room]).length === 2) {
-          io.in(socket.room).emit('start-call', username);
+        socket.to(roomCode).broadcast.send({ type: 'success', content: `${user.full_name} joined` });
+        if (Object.keys(rooms[roomCode]).length === 2) {
+          io.in(socket.roomCode).emit('start-call', userId);
         }
       }
     });
 
     const leave = () => {
-      const { room, username } = socket;
-      if (rooms[room] && rooms[room][username]) {
-        delete rooms[room][username];
-        socket.leave(room);
-        io.to(room).emit('peers', rooms[room]);
-        io.to(room).send({ type: 'error', content: `${username} đã rời phòng` });
+      const { roomCode, userId } = socket;
+      if (rooms[roomCode] && rooms[roomCode][userId]) {
+        delete rooms[roomCode][userId];
+        socket.leave(roomCode);
+        io.to(roomCode).emit('peers', rooms[roomCode]);
+        io.to(roomCode).send({ type: 'error', content: `${userId} đã rời phòng` });
       }
     };
 
     socket.on('leave', leave);
     socket.on('disconnect', leave);
     socket.on('rtc-signal', (data) => {
-      io.in(socket.room).emit('rtc-signal', data);
+      io.in(socket.roomCode).emit('rtc-signal', data);
     });
   });
 };
