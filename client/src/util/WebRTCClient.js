@@ -66,8 +66,9 @@ export default class PeerClient extends EventEmitter {
       }
     });
     socket.emit('join', { roomCode, userId });
-    socket.once('join-success', () => {
-      this.joined = true;
+    socket.once('join-success', ({ user, room }) => {
+      this.emit('join-success', { user, room });
+      this.user = user;
       this.getCameraStream();
     });
     socket.on('partner-leave', () => {
@@ -89,6 +90,9 @@ export default class PeerClient extends EventEmitter {
     });
     socket.on('toast', (message) => {
       this.emit('toast', message);
+    });
+    socket.on('chat-messages', (messages) => {
+      this.emit('chat-messages', messages);
     });
   }
 
@@ -182,6 +186,7 @@ export default class PeerClient extends EventEmitter {
       this.sendConfig();
       audioTrack.enabled = enabled;
     }
+    this.sendMessage(`${this.user.full_name} turn ${enabled ? 'on' : 'off'} microphone`, 'LOG');
   }
 
   enableVideo = (enabled) => {
@@ -191,6 +196,7 @@ export default class PeerClient extends EventEmitter {
       videoTrack.enabled = enabled;
       this.sendConfig();
     }
+    this.sendMessage(`${this.user.full_name} turn ${enabled ? 'on' : 'off'} camera`, 'LOG');
   }
 
   requestShareScreen = async () => {
@@ -241,6 +247,13 @@ export default class PeerClient extends EventEmitter {
   sendConfig = () => {
     this.send(`remote-camera-${this.cameraOn ? 'on' : 'off'}`);
     this.send(`remote-microphone-${this.microphoneOn ? 'on' : 'off'}`);
+  }
+
+  sendMessage = (text, type = 'MESSAGE') => {
+    socket.emit('chat-messages', {
+      type,
+      content: text,
+    });
   }
 
   destroy = () => {

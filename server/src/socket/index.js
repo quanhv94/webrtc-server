@@ -1,11 +1,13 @@
 import socketIO from 'socket.io';
+import moment from 'moment';
+import uuid from 'uuid/v4';
 import request from 'request-promise';
 
 const checkRoom = async ({ roomCode, userId }) => {
   if (roomCode === 'room1') {
     return {
       room: {},
-      user: { full_name: userId },
+      user: { full_name: userId, id: userId },
     };
   }
   try {
@@ -32,7 +34,7 @@ const setupSocket = (server) => {
   io.on('connection', (socket) => {
     socket.on('join', async ({ roomCode, userId }) => {
       rooms[roomCode] = rooms[roomCode] || {};
-      const { user, error } = await checkRoom({ roomCode, userId });
+      const { user, room, error } = await checkRoom({ roomCode, userId });
       if (error) {
         socket.emit('join-error', error);
         return;
@@ -45,9 +47,10 @@ const setupSocket = (server) => {
       } else {
         socket.roomCode = roomCode;
         socket.userId = userId;
+        socket.user = user;
         socket.join(roomCode);
         rooms[roomCode][userId] = socket.id;
-        socket.emit('join-success');
+        socket.emit('join-success', { user, room });
         socket.emit('toast', { type: 'success', content: `Hello ${user.full_name}` });
         socket.to(roomCode).broadcast.emit('toast', { type: 'success', content: `${user.full_name} joined` });
         if (Object.keys(rooms[roomCode]).length >= 2) {
@@ -71,6 +74,12 @@ const setupSocket = (server) => {
     socket.on('disconnect', leave);
     socket.on('rtc-signal', (data) => {
       io.in(socket.roomCode).emit('rtc-signal', data);
+    });
+    socket.on('chat-messages', (message) => {
+      message.id = uuid();
+      message.sender = socket.user;
+      message.time = moment().format();
+      io.in(socket.roomCode).emit('chat-messages', message);
     });
   });
 };

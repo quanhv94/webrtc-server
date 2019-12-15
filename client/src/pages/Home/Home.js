@@ -2,10 +2,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
+import _ from 'lodash';
 import { Button } from 'reactstrap';
 import { toast } from 'react-toastify';
 import PeerClient from '../../util/WebRTCClient';
 import './style.scss';
+import Sidebar from './Sidebar';
 
 export default class Home extends React.Component {
   static propTypes = {
@@ -19,9 +21,11 @@ export default class Home extends React.Component {
     this.state = {
       ready: false,
       hasPartner: false,
+      currentUser: null,
       userId,
       roomCode,
       error: '',
+      messages: [],
       localConfig: {
         shareScreenOn: false,
         microphoneOn: true,
@@ -49,6 +53,9 @@ export default class Home extends React.Component {
 
   createPeerClient = ({ roomCode, userId }) => {
     const peerClient = new PeerClient({ roomCode, userId });
+    peerClient.on('join-success', ({ user }) => {
+      this.setState({ currentUser: user });
+    });
     peerClient.on('ready', () => {
       this.setState({ ready: true });
     });
@@ -110,6 +117,10 @@ export default class Home extends React.Component {
     peerClient.on('partner-join', () => {
       this.setState({ hasPartner: true });
     });
+    peerClient.on('chat-messages', (newMessages) => {
+      const { messages } = this.state;
+      this.setState({ messages: _.concat(messages, newMessages) });
+    });
     this.peerClient = peerClient;
   }
 
@@ -136,6 +147,10 @@ export default class Home extends React.Component {
     } else {
       this.peerClient.requestShareScreen();
     }
+  }
+
+  sendMessage = (text) => {
+    this.peerClient.sendMessage(text);
   }
 
   renderHeader = () => {
@@ -195,6 +210,8 @@ export default class Home extends React.Component {
       hasPartner,
       remoteConfig,
       error,
+      currentUser,
+      messages,
     } = this.state;
     return (
       <div className={classnames('home-page')}>
@@ -207,7 +224,7 @@ export default class Home extends React.Component {
                 playsInline
                 autoPlay
               />
-              <div className="controls">
+              <div className={classnames('controls', { 'd-none': !hasPartner })}>
                 <Button
                   color="transparent"
                   className={classnames({ active: remoteConfig.microphoneOn })}
@@ -222,7 +239,11 @@ export default class Home extends React.Component {
                 </Button>
               </div>
             </div>
-            <div className="sidebar" />
+            <Sidebar
+              currentUser={currentUser}
+              messages={messages}
+              onSendMessage={this.sendMessage}
+            />
           </div>
         </div>
         <div className={classnames('waitting-ready', { 'd-none': ready })}>
