@@ -8,7 +8,7 @@ import {
 import { Helmet } from 'react-helmet';
 import { Provider } from 'react-redux';
 import { ThroughProvider } from 'react-through';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import Login from './pages/Login/Login';
 import Home from './pages/Home/Home';
 import store from './state/store';
@@ -37,7 +37,11 @@ const App = () => (
             <Redirect to="/" />
           </Switch>
         </Router>
-        <ToastContainer hideProgressBar />
+        <ToastContainer
+          hideProgressBar
+          position={toast.POSITION.TOP_CENTER}
+          closeButton={false}
+        />
       </div>
     </ThroughProvider>
   </Provider>

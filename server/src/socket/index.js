@@ -2,7 +2,7 @@ import socketIO from 'socket.io';
 import request from 'request-promise';
 
 const checkRoom = async ({ roomCode, userId }) => {
-  if (roomCode === 'roomCode1') {
+  if (roomCode === 'room1') {
     return {
       room: {},
       user: { full_name: userId },
@@ -47,11 +47,12 @@ const setupSocket = (server) => {
         socket.userId = userId;
         socket.join(roomCode);
         rooms[roomCode][userId] = socket.id;
-        io.in(roomCode).emit('peers', rooms[roomCode]);
-        socket.send({ type: 'success', content: `Hello ${user.full_name}` });
-        socket.to(roomCode).broadcast.send({ type: 'success', content: `${user.full_name} joined` });
-        if (Object.keys(rooms[roomCode]).length === 2) {
-          io.in(socket.roomCode).emit('start-call', userId);
+        socket.emit('join-success');
+        socket.emit('toast', { type: 'success', content: `Hello ${user.full_name}` });
+        socket.to(roomCode).broadcast.emit('toast', { type: 'success', content: `${user.full_name} joined` });
+        if (Object.keys(rooms[roomCode]).length >= 2) {
+          io.in(socket.roomCode).emit('make-peer', userId);
+          io.in(socket.roomCode).emit('partner-join');
         }
       }
     });
@@ -61,8 +62,8 @@ const setupSocket = (server) => {
       if (rooms[roomCode] && rooms[roomCode][userId]) {
         delete rooms[roomCode][userId];
         socket.leave(roomCode);
-        io.to(roomCode).emit('peers', rooms[roomCode]);
-        io.to(roomCode).send({ type: 'error', content: `${userId} đã rời phòng` });
+        io.to(roomCode).emit('partner-leave', userId);
+        io.to(roomCode).emit('toast', { type: 'error', content: `${userId} leaved` });
       }
     };
 

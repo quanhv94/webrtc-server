@@ -3,7 +3,7 @@ import { Button } from 'reactstrap';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
 
-const Controls = ({
+const Header = ({
   microphoneOn,
   cameraOn,
   shareScreenOn,
@@ -52,7 +52,7 @@ const Controls = ({
   );
 };
 
-Controls.propTypes = {
+Header.propTypes = {
   microphoneOn: PropTypes.bool.isRequired,
   cameraOn: PropTypes.bool.isRequired,
   shareScreenOn: PropTypes.bool.isRequired,
@@ -63,4 +63,4 @@ Controls.propTypes = {
   onClickRecord: PropTypes.func.isRequired,
 };
 
-export default Controls;
+export default Header;

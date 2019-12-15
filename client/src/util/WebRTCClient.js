@@ -58,33 +58,62 @@ export default class PeerClient extends EventEmitter {
     super();
     this.roomCode = roomCode;
     this.userId = userId;
-    socket.addEventListener('rtc-signal', this.handleSignaling);
-    this.getCameraStream();
+    this.cameraOn = true;
+    this.microphoneOn = true;
+    socket.addEventListener('rtc-signal', (data) => {
+      if (data.senderId !== this.userId) {
+        this.peer.signal(data.signal);
+      }
+    });
+    socket.emit('join', { roomCode, userId });
+    socket.once('join-success', () => {
+      this.joined = true;
+      this.getCameraStream();
+    });
+    socket.on('partner-leave', () => {
+      this.remoteCameraStream = null;
+      this.remoteScreenStream = null;
+      this.destroyOldPeer();
+      this.emit('partner-leave');
+      this.playSoundEffect('leave');
+    });
+    socket.on('partner-join', () => {
+      this.emit('partner-join');
+      this.playSoundEffect('join');
+    });
+    socket.on('make-peer', (callerId) => {
+      this.makePeer({ initiator: callerId === this.userId });
+    });
+    socket.on('join-error', (error) => {
+      this.emit('join-error', error);
+    });
+    socket.on('toast', (message) => {
+      this.emit('toast', message);
+    });
+  }
+
+  playSoundEffect = (name) => {
+    console.log(`Play sound: ${name}`);
+    const audio = new Audio();
+    audio.src = `/audio/${name}.mp3`;
+    audio.play();
   }
 
   getCameraStream = async () => {
     try {
       if (!this.localCameraStream) {
         this.localCameraStream = await getUserMedia();
-        this.localCameraStream.name = 'camera';
         this.emit('ready');
         this.emit('local-camera-stream', this.localCameraStream);
       }
       return this.localCameraStream;
     } catch (error) {
-      console.log(error);
-      this.emit('error', 'Can not access camera');
+      this.emit('toast', { type: 'error', content: 'Can not access camera' });
       return null;
     }
   }
 
-  handleSignaling = (data) => {
-    if (data.roomCode === this.roomCode && data.from !== this.userId) {
-      this.peer.signal(data.signal);
-    }
-  }
-
-  startCall = ({ initiator }) => {
+  makePeer = ({ initiator }) => {
     this.destroyOldPeer();
     this.peer = new Peer({
       initiator,
@@ -95,28 +124,38 @@ export default class PeerClient extends EventEmitter {
     this.peer.on('signal', (signal) => {
       socket.emit('rtc-signal', {
         roomCode: this.roomCode,
-        from: this.userId,
+        senderId: this.userId,
         signal,
       });
     });
 
     this.peer.on('connect', async () => {
-      this.emit('connect');
       if (this.localCameraStream) {
         this.peer.addStream(this.localCameraStream);
         if (this.localScreenStream) {
           this.peer.addStream(this.localScreenStream);
         }
       }
+      this.send(`greeting from ${this.userId}`);
+      this.sendConfig();
     });
 
     this.peer.on('data', (data) => {
       const str = data.toString();
       if (str === 'remote-screen-stream-ended') {
         this.emit('remote-screen-stream-ended');
+      } else if (str === 'remote-camera-on') {
+        this.emit('remote-camera-on');
+      } else if (str === 'remote-camera-off') {
+        this.emit('remote-camera-off');
+      } else if (str === 'remote-microphone-on') {
+        this.emit('remote-microphone-on');
+      } else if (str === 'remote-microphone-off') {
+        this.emit('remote-microphone-off');
       } else {
         this.emit('data', str);
       }
+      console.log('--on data--', str);
     });
 
     this.peer.on('stream', (stream) => {
@@ -137,43 +176,46 @@ export default class PeerClient extends EventEmitter {
   }
 
   mute = (enabled) => {
+    this.microphoneOn = enabled;
     const audioTrack = this.localCameraStream.getAudioTracks()[0];
     if (audioTrack) {
+      this.sendConfig();
       audioTrack.enabled = enabled;
     }
   }
 
   enableVideo = (enabled) => {
+    this.cameraOn = enabled;
     const videoTrack = this.localCameraStream.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.enabled = enabled;
+      this.sendConfig();
     }
   }
 
-  toggleShareScreen = async () => {
+  requestShareScreen = async () => {
     try {
-      if (this.localScreenStream) {
-        this.localScreenStream.getTracks().forEach((x) => x.stop());
+      const localScreenStream = await getDisplayMedia();
+      this.localScreenStream = localScreenStream;
+      localScreenStream.getTracks()[0].addEventListener('ended', () => {
+        this.localScreenStream = null;
         this.emit('local-screen-stream-ended');
         this.send('remote-screen-stream-ended');
-        this.localScreenStream = null;
-      } else {
-        const localScreenStream = await getDisplayMedia();
-        this.localScreenStream = localScreenStream;
-        localScreenStream.getTracks()[0].addEventListener('ended', () => {
-          this.localScreenStream = null;
-          this.emit('local-screen-stream-ended');
-          this.send('remote-screen-stream-ended');
-        });
-        this.emit('local-screen-stream', localScreenStream);
-        if (this.peer) {
-          this.peer.addStream(localScreenStream);
-        }
+      });
+      this.emit('local-screen-stream', localScreenStream);
+      if (this.peer) {
+        this.peer.addStream(localScreenStream);
       }
     } catch (error) {
-      console.log(error);
-      this.emit('error', 'Can not access display');
+      this.emit('toast', { type: 'error', content: 'Can not access display' });
     }
+  }
+
+  removeShareScreen = () => {
+    this.localScreenStream.getTracks().forEach((x) => x.stop());
+    this.emit('local-screen-stream-ended');
+    this.send('remote-screen-stream-ended');
+    this.localScreenStream = null;
   }
 
   requestRecordScreenStream = async () => {
@@ -184,7 +226,7 @@ export default class PeerClient extends EventEmitter {
       return recordScreenStream;
     } catch (error) {
       console.log(error);
-      this.emit('error', 'Can not access display');
+      this.emit('message', { type: 'error', content: 'Can not access display' });
       return null;
     }
   }
@@ -196,14 +238,21 @@ export default class PeerClient extends EventEmitter {
     }
   }
 
+  sendConfig = () => {
+    this.send(`remote-camera-${this.cameraOn ? 'on' : 'off'}`);
+    this.send(`remote-microphone-${this.microphoneOn ? 'on' : 'off'}`);
+  }
+
   destroy = () => {
     this.destroyOldPeer();
-    socket.removeAllListeners('rtc-signal', this.handleSignaling);
+    socket.emit('leave');
+    socket.removeAllListeners();
   }
 
   destroyOldPeer = () => {
     if (this.peer) {
       this.peer.destroy();
+      this.peer = null;
     }
   }
 

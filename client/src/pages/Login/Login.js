@@ -12,7 +12,7 @@ export default class Login extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      roomCode: 'roomCode1',
+      roomCode: 'room1',
       userId: faker.name.firstName().toLocaleLowerCase(),
     };
   }

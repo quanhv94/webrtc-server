@@ -1,16 +1,11 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import React from 'react';
-import { Button } from 'reactstrap';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
-import { RecordRTCPromisesHandler, invokeSaveAsDialog } from 'recordrtc';
+import { Button } from 'reactstrap';
 import { toast } from 'react-toastify';
-import { confirmAlert } from 'react-confirm-alert';
-import Controls from './Controls';
-import socket from '../../socket';
-import './style.scss';
 import PeerClient from '../../util/WebRTCClient';
-import RecordTimer from './RecordTimer';
+import './style.scss';
 
 export default class Home extends React.Component {
   static propTypes = {
@@ -22,231 +17,223 @@ export default class Home extends React.Component {
     const { match } = props;
     const { userId, roomCode } = match.params;
     this.state = {
-      hasCameraPermission: false,
-      screenFull: 0,
-      microphoneOn: true,
-      cameraOn: true,
-      shareScreenOn: false,
-      recordOn: false,
+      ready: false,
+      hasPartner: false,
       userId,
       roomCode,
       error: '',
-      peers: {},
+      localConfig: {
+        shareScreenOn: false,
+        microphoneOn: true,
+        cameraOn: true,
+      },
+      remoteConfig: {
+        shareScreenOn: false,
+        microphoneOn: true,
+        cameraOn: true,
+      },
     };
+    this.mainVideo = React.createRef();
+    this.smallVideo1 = React.createRef();
+    this.smallVideo2 = React.createRef();
   }
 
   componentDidMount() {
     const { roomCode, userId } = this.state;
-    this.createPeerClient({ roomCode, userId }).on('ready', () => {
-      this.setState({ hasCameraPermission: true });
-      socket.emit('join', { roomCode, userId });
-      socket.addEventListener('message', this.showMessage);
-      socket.addEventListener('peers', this.handlePeers);
-      socket.addEventListener('join-error', this.handleError);
-      socket.addEventListener('start-call', this.startCall);
-    });
+    this.createPeerClient({ roomCode, userId });
   }
 
   componentWillUnmount() {
-    this.removePeerClient();
-    socket.emit('leave');
-    socket.removeEventListener('message', this.showMessage);
-    socket.removeEventListener('peers', this.handlePeers);
-    socket.removeEventListener('join-error', this.handleError);
-    socket.removeEventListener('start-call', this.startCall);
-  }
-
-  createPeerClient = ({ roomCode, userId }) => {
-    this.peerClient = new PeerClient({ roomCode, userId });
-    this.peerClient.on('local-camera-stream', (stream) => {
-      const video = document.querySelector('#localVideo1');
-      video.srcObject = stream;
-    });
-    this.peerClient.on('local-screen-stream', (stream) => {
-      const video1 = document.querySelector('#localVideo1');
-      const video2 = document.querySelector('#localVideo2');
-      video2.srcObject = video1.srcObject;
-      video1.srcObject = stream;
-      this.setState({ shareScreenOn: true });
-    });
-    this.peerClient.on('local-screen-stream-ended', () => {
-      const video1 = document.querySelector('#localVideo1');
-      const video2 = document.querySelector('#localVideo2');
-      video1.srcObject = video2.srcObject;
-      video2.srcObject = null;
-      this.setState({ shareScreenOn: false });
-    });
-    this.peerClient.on('remote-camera-stream', (stream) => {
-      const video = document.querySelector('#remoteVideo1');
-      video.srcObject = stream;
-    });
-    this.peerClient.on('remote-screen-stream', (stream) => {
-      const video1 = document.querySelector('#remoteVideo1');
-      const video2 = document.querySelector('#remoteVideo2');
-      video2.srcObject = video1.srcObject;
-      video1.srcObject = stream;
-    });
-    this.peerClient.on('remote-screen-stream-ended', () => {
-      const video1 = document.querySelector('#remoteVideo1');
-      const video2 = document.querySelector('#remoteVideo2');
-      video1.srcObject = video2.srcObject;
-      video2.srcObject = null;
-    });
-    this.peerClient.on('error', (error) => {
-      toast.error(error);
-    });
-    return this.peerClient;
-  }
-
-  removePeerClient = () => {
     this.peerClient.destroy();
   }
 
-  toggleFullscreen = (index) => {
-    const { screenFull } = this.state;
-    if (index === screenFull) {
-      this.setState({ screenFull: 0 });
-    } else {
-      this.setState({ screenFull: index });
-    }
-  }
-
-  showMessage = (message) => {
-    if (toast[message.type]) {
+  createPeerClient = ({ roomCode, userId }) => {
+    const peerClient = new PeerClient({ roomCode, userId });
+    peerClient.on('ready', () => {
+      this.setState({ ready: true });
+    });
+    peerClient.on('local-camera-stream', (stream) => {
+      this.smallVideo1.current.srcObject = stream;
+    });
+    peerClient.on('local-screen-stream', () => {
+      const { localConfig } = this.state;
+      localConfig.shareScreenOn = true;
+      this.setState({ localConfig });
+    });
+    peerClient.on('local-screen-stream-ended', () => {
+      const { localConfig } = this.state;
+      localConfig.shareScreenOn = false;
+      this.setState({ localConfig });
+    });
+    peerClient.on('remote-camera-stream', (stream) => {
+      this.mainVideo.current.srcObject = stream;
+    });
+    peerClient.on('remote-screen-stream', (stream) => {
+      this.smallVideo2.current.srcObject = this.mainVideo.current.srcObject;
+      this.mainVideo.current.srcObject = stream;
+    });
+    peerClient.on('remote-screen-stream-ended', () => {
+      this.mainVideo.current.srcObject = this.smallVideo2.current.srcObject;
+      this.smallVideo2.current.srcObject = null;
+    });
+    peerClient.on('remote-camera-on', () => {
+      const { remoteConfig } = this.state;
+      remoteConfig.cameraOn = true;
+      this.setState({ remoteConfig });
+    });
+    peerClient.on('remote-camera-off', () => {
+      const { remoteConfig } = this.state;
+      remoteConfig.cameraOn = false;
+      this.setState({ remoteConfig });
+    });
+    peerClient.on('remote-microphone-on', () => {
+      const { remoteConfig } = this.state;
+      remoteConfig.microphoneOn = true;
+      this.setState({ remoteConfig });
+    });
+    peerClient.on('remote-microphone-off', () => {
+      const { remoteConfig } = this.state;
+      remoteConfig.microphoneOn = false;
+      this.setState({ remoteConfig });
+    });
+    peerClient.on('toast', (message) => {
       toast[message.type](message.content);
-    }
-  }
-
-  handleError = (error) => {
-    this.setState({ error });
-  }
-
-  handlePeers = (peers) => {
-    this.setState({ peers });
-    if (Object.keys(peers).length < 2) {
-      const video1 = document.querySelector('#remoteVideo1');
-      const video2 = document.querySelector('#remoteVideo2');
-      video1.srcObject = null;
-      video2.srcObject = null;
-    }
-  }
-
-  startCall = (caller) => {
-    const { userId } = this.state;
-    this.peerClient.startCall({ initiator: caller === userId });
+    });
+    peerClient.on('join-error', (error) => {
+      this.setState({ error });
+    });
+    peerClient.on('partner-leave', () => {
+      this.setState({ hasPartner: false });
+      this.mainVideo.current.srcObject = null;
+      this.smallVideo2.current.srcObject = null;
+    });
+    peerClient.on('partner-join', () => {
+      this.setState({ hasPartner: true });
+    });
+    this.peerClient = peerClient;
   }
 
   toggleMicrophone = () => {
-    const { microphoneOn } = this.state;
-    this.setState({ microphoneOn: !microphoneOn }, () => {
-      this.peerClient.mute(!microphoneOn);
+    const { localConfig } = this.state;
+    localConfig.microphoneOn = !localConfig.microphoneOn;
+    this.setState({ localConfig }, () => {
+      this.peerClient.mute(localConfig.microphoneOn);
     });
   }
 
   toggleCamera = () => {
-    const { cameraOn } = this.state;
-    this.setState({ cameraOn: !cameraOn }, () => {
-      this.peerClient.enableVideo(!cameraOn);
+    const { localConfig } = this.state;
+    localConfig.cameraOn = !localConfig.cameraOn;
+    this.setState({ localConfig }, () => {
+      this.peerClient.enableVideo(localConfig.cameraOn);
     });
   }
 
   toggleShareScreen = () => {
-    this.peerClient.toggleShareScreen();
+    const { localConfig } = this.state;
+    if (localConfig.shareScreenOn) {
+      this.peerClient.removeShareScreen();
+    } else {
+      this.peerClient.requestShareScreen();
+    }
   }
 
-  toggleRecord = async () => {
-    const { recordOn } = this.state;
-    if (!recordOn) {
-      confirmAlert({
-        title: 'Screen record confirm',
-        message: 'Do you really want to record your screen. You need to save before record again each 30 minutes.',
-        buttons: [
-          {
-            label: 'OK',
-            onClick: async () => {
-              const screenStream = await this.peerClient.requestRecordScreenStream();
-              if (!screenStream) return;
-              this.setState({ recordOn: true });
-              screenStream.getVideoTracks()[0].addEventListener('ended', () => {
-                this.toggleRecord();
-              });
-              this.recorder = new RecordRTCPromisesHandler(screenStream, {
-                type: 'video',
-                disableLogs: true,
-              });
-              this.recorder.startRecording();
-            },
-          },
-          {
-            label: 'Cancel',
-          },
-        ],
-      });
-    } else {
-      this.setState({ recordOn: false });
-      await this.recorder.stopRecording();
-      const blob = await this.recorder.getBlob();
-      invokeSaveAsDialog(blob);
-      this.recorder.destroy();
-      this.peerClient.removeRecordScreenStream();
-    }
+  renderHeader = () => {
+    const {
+      localConfig,
+    } = this.state;
+    return (
+      <div className="header">
+        <div className="header-left">
+          <div className="local-camera">
+            <video
+              ref={this.smallVideo1}
+              playsInline
+              autoPlay
+            />
+            <div className="controls">
+              <Button
+                color="transparent"
+                className={classnames({ active: localConfig.microphoneOn })}
+                onClick={this.toggleMicrophone}
+              >
+                <i className="icon-microphone" />
+              </Button>
+              <Button
+                color="transparent"
+                className={classnames({ active: localConfig.cameraOn })}
+                onClick={this.toggleCamera}
+              >
+                <i className="icon-camrecorder" />
+              </Button>
+            </div>
+          </div>
+          <div className="remote-camera">
+            <video
+              ref={this.smallVideo2}
+              playsInline
+              autoPlay
+            />
+          </div>
+        </div>
+        <div className="header-right">
+          <Button
+            color="transparent"
+            className={classnames({ active: localConfig.shareScreenOn })}
+            onClick={this.toggleShareScreen}
+          >
+            <i className="icon-screen-desktop" />
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   render() {
     const {
-      hasCameraPermission,
-      screenFull,
-      microphoneOn,
-      cameraOn,
-      shareScreenOn,
-      recordOn,
+      ready,
+      hasPartner,
+      remoteConfig,
       error,
-      peers,
     } = this.state;
     return (
       <div className={classnames('home-page')}>
         <div className={classnames('content-wrapper')}>
+          {this.renderHeader()}
           <div className="screen-wrapper">
-            <div className="screen" style={{ flexBasis: ['50%', '80%', '20%'][screenFull] }}>
-              <div className="screen-content">
-                <video id="localVideo1" playsInline autoPlay muted />
-                <video id="localVideo2" playsInline autoPlay muted />
+            <div className="main-video-container">
+              <video
+                ref={this.mainVideo}
+                playsInline
+                autoPlay
+              />
+              <div className="controls">
+                <Button
+                  color="transparent"
+                  className={classnames({ active: remoteConfig.microphoneOn })}
+                >
+                  <i className="icon-microphone" />
+                </Button>
+                <Button
+                  color="transparent"
+                  className={classnames({ active: remoteConfig.cameraOn })}
+                >
+                  <i className="icon-camrecorder" />
+                </Button>
               </div>
-              <Button color="transparent" onClick={() => this.toggleFullscreen(1)}>
-                <i className={`icon-size-${screenFull === 1 ? 'actual' : 'fullscreen'}`} />
-              </Button>
             </div>
-            <div className="screen" style={{ flexBasis: ['50%', '20%', '80%'][screenFull] }}>
-              <div className="screen-content">
-                <video id="remoteVideo1" playsInline autoPlay />
-                <video id="remoteVideo2" playsInline autoPlay />
-              </div>
-              <Button color="transparent" onClick={() => this.toggleFullscreen(2)}>
-                <i className={`icon-size-${screenFull === 2 ? 'actual' : 'fullscreen'}`} />
-              </Button>
-            </div>
+            <div className="sidebar" />
           </div>
-          <Controls
-            microphoneOn={microphoneOn}
-            cameraOn={cameraOn}
-            shareScreenOn={shareScreenOn}
-            recordOn={recordOn}
-            onClickMicrophone={this.toggleMicrophone}
-            onClickCamera={this.toggleCamera}
-            onClickShareScreen={this.toggleShareScreen}
-            onClickRecord={this.toggleRecord}
-          />
+        </div>
+        <div className={classnames('waitting-ready', { 'd-none': ready })}>
+          <h4>Please wait ...</h4>
         </div>
         <div className={classnames('error', { 'd-none': !error })}>
           <h3>{error}</h3>
         </div>
-        <div className={classnames('watting-camera-permission', { 'd-none': hasCameraPermission })}>
-          <h4>Accessing camera</h4>
-        </div>
-        <div className={classnames('watting-message', { 'd-none': Object.keys(peers).length >= 2 })}>
+        <div className={classnames('waitting-partner-message', { 'd-none': hasPartner })}>
           <p>Please wait for your partner</p>
         </div>
-        {recordOn && <RecordTimer timeout={60 * 30} onTimeout={this.toggleRecord} />}
       </div>
     );
   }
