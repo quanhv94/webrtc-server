@@ -75,11 +75,11 @@ const setupSocket = (server) => {
     socket.on('rtc-signal', (data) => {
       io.in(socket.roomCode).emit('rtc-signal', data);
     });
-    socket.on('chat-messages', (message) => {
+    socket.on('chat-message', (message) => {
       message.id = uuid();
       message.sender = socket.user;
       message.time = moment().format();
-      io.in(socket.roomCode).emit('chat-messages', message);
+      io.in(socket.roomCode).emit('chat-message', message);
     });
   });
 };

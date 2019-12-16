@@ -117,7 +117,7 @@ export default class Home extends React.Component {
     peerClient.on('partner-join', () => {
       this.setState({ hasPartner: true });
     });
-    peerClient.on('chat-messages', (newMessages) => {
+    peerClient.on('chat-message', (newMessages) => {
       const { messages } = this.state;
       this.setState({ messages: _.concat(messages, newMessages) });
     });

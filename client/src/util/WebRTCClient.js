@@ -91,8 +91,8 @@ export default class PeerClient extends EventEmitter {
     socket.on('toast', (message) => {
       this.emit('toast', message);
     });
-    socket.on('chat-messages', (messages) => {
-      this.emit('chat-messages', messages);
+    socket.on('chat-message', (messages) => {
+      this.emit('chat-message', messages);
     });
   }
 
@@ -250,7 +250,7 @@ export default class PeerClient extends EventEmitter {
   }
 
   sendMessage = (text, type = 'MESSAGE') => {
-    socket.emit('chat-messages', {
+    socket.emit('chat-message', {
       type,
       content: text,
     });
