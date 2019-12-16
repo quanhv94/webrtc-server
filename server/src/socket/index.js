@@ -4,9 +4,12 @@ import uuid from 'uuid/v4';
 import request from 'request-promise';
 
 const checkRoom = async ({ roomCode, userId }) => {
-  if (roomCode === 'room1') {
+  if (roomCode === 'rabita') {
     return {
-      room: {},
+      room: {
+        id: 100,
+        description: 'Đây là mô tả room',
+      },
       user: { full_name: userId, id: userId },
     };
   }
@@ -54,8 +57,8 @@ const setupSocket = (server) => {
         socket.emit('toast', { type: 'success', content: `Hello ${user.full_name}` });
         socket.to(roomCode).broadcast.emit('toast', { type: 'success', content: `${user.full_name} joined` });
         if (Object.keys(rooms[roomCode]).length >= 2) {
-          io.in(socket.roomCode).emit('make-peer', userId);
-          io.in(socket.roomCode).emit('partner-join');
+          io.in(socket.roomCode).emit('make-peer', { callerId: userId });
+          io.in(socket.roomCode).emit('partner-join', true);
         }
       }
     });

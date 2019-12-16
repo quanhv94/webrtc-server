@@ -1,6 +1,7 @@
 import Peer from 'simple-peer';
 import EventEmitter from 'eventemitter3';
 import socket from '../socket/index';
+import LocalStorage from './LocalStorage';
 
 const iceServers = [
   {
@@ -53,9 +54,10 @@ const getDisplayMedia = () => {
   return displayStream;
 };
 
-export default class PeerClient extends EventEmitter {
+class PeerClient extends EventEmitter {
   constructor({ roomCode, userId }) {
     super();
+    if (!roomCode || !userId) return;
     this.roomCode = roomCode;
     this.userId = userId;
     this.cameraOn = true;
@@ -78,11 +80,11 @@ export default class PeerClient extends EventEmitter {
       this.emit('partner-leave');
       this.playSoundEffect('leave');
     });
-    socket.on('partner-join', () => {
-      this.emit('partner-join');
+    socket.on('partner-join', (partner) => {
+      this.emit('partner-join', partner);
       this.playSoundEffect('join');
     });
-    socket.on('make-peer', (callerId) => {
+    socket.on('make-peer', ({ callerId }) => {
       this.makePeer({ initiator: callerId === this.userId });
     });
     socket.on('join-error', (error) => {
@@ -109,6 +111,13 @@ export default class PeerClient extends EventEmitter {
         this.localCameraStream = await getUserMedia();
         this.emit('ready');
         this.emit('local-camera-stream', this.localCameraStream);
+        const userConfig = LocalStorage.loadUserConfig(this.user.id);
+        if (userConfig) {
+          this.localCameraStream.getVideoTracks()[0].enabled = userConfig.cameraOn;
+          this.cameraOn = userConfig.cameraOn;
+          this.localCameraStream.getAudioTracks()[0].enabled = userConfig.microphoneOn;
+          this.microphoneOn = userConfig.microphoneOn;
+        }
       }
       return this.localCameraStream;
     } catch (error) {
@@ -179,7 +188,7 @@ export default class PeerClient extends EventEmitter {
     }
   }
 
-  mute = (enabled) => {
+  enableAudio = (enabled) => {
     this.microphoneOn = enabled;
     const audioTrack = this.localCameraStream.getAudioTracks()[0];
     if (audioTrack) {
@@ -249,10 +258,10 @@ export default class PeerClient extends EventEmitter {
     this.send(`remote-microphone-${this.microphoneOn ? 'on' : 'off'}`);
   }
 
-  sendMessage = (text, type = 'MESSAGE') => {
+  sendMessage = (content, type = 'TEXT') => {
     socket.emit('chat-message', {
       type,
-      content: text,
+      content,
     });
   }
 
@@ -271,3 +280,9 @@ export default class PeerClient extends EventEmitter {
 
   static isSupported = () => Peer.WEBRTC_SUPPORT;
 }
+
+const { pathname } = window.location;
+const params = pathname.split('/');
+const peerClient = new PeerClient({ roomCode: params[1], userId: params[2] });
+
+export default peerClient;

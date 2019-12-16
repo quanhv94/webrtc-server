@@ -1,7 +1,7 @@
 import { handleActions } from 'redux-actions';
 
 const initialState = {
-  appName: 'RabiKnow',
+  appName: 'eschool-meeting',
 };
 
 const actions = {};

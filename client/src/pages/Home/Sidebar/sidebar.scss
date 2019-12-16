@@ -1,0 +1,31 @@
+.sidebar {
+  background-color: #fff;
+  min-width: 350px;
+  max-width: calc(100vw - 200px);
+  display: flex;
+  flex-direction: column;
+  .nav-tabs {
+    margin-bottom: 10px;
+    background-color: #f4f4f4;
+    .nav-item {
+      flex: 1;
+      cursor: pointer;
+      a {
+        border: none;
+        background-color: none;
+        text-align: center;
+        border-bottom: 4px transparent solid !important;
+        &.active {
+          background: none;
+          border-bottom: 4px #f26b4c solid !important;
+        }
+      }
+    }
+  }
+  .tab-content{
+    flex: 1;
+    .tab-pane {
+      height: 100%;
+    }
+  }
+}

@@ -1,42 +1,43 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import React from 'react';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
-import _ from 'lodash';
 import { Button } from 'reactstrap';
 import { toast } from 'react-toastify';
-import PeerClient from '../../util/WebRTCClient';
+import peerClient from '../../util/WebRTCClient';
+import Sidebar from './Sidebar/Sidebar';
+import errorActions from '../../state/error/actions';
+import roomActions from '../../state/room/actions';
+import userActions from '../../state/user/actions';
+import partnerActions from '../../state/partner/actions';
+import userConfigActions from '../../state/userConfig/actions';
+import partnerConfigActions from '../../state/partnerConfig/actions';
 import './style.scss';
-import Sidebar from './Sidebar';
+import LocalStorage from '../../util/LocalStorage';
 
-export default class Home extends React.Component {
+class Home extends React.Component {
   static propTypes = {
-    match: PropTypes.object.isRequired,
+    setError: PropTypes.func.isRequired,
+    error: PropTypes.string.isRequired,
+    hasPartner: PropTypes.bool.isRequired,
+    setPartner: PropTypes.func.isRequired,
+    userConfig: PropTypes.object.isRequired,
+    partnerConfig: PropTypes.object.isRequired,
+    setCurrentUser: PropTypes.func.isRequired,
+    setRoom: PropTypes.func.isRequired,
+    setCamera: PropTypes.func.isRequired,
+    setMicrophone: PropTypes.func.isRequired,
+    setShareScreen: PropTypes.func.isRequired,
+    setPartnerCamera: PropTypes.func.isRequired,
+    setPartnerMicrophone: PropTypes.func.isRequired,
+    setPartnerShareScreen: PropTypes.func.isRequired,
   }
 
   constructor(props) {
     super(props);
-    const { match } = props;
-    const { userId, roomCode } = match.params;
-    this.state = {
-      ready: false,
-      hasPartner: false,
-      currentUser: null,
-      userId,
-      roomCode,
-      error: '',
-      messages: [],
-      localConfig: {
-        shareScreenOn: false,
-        microphoneOn: true,
-        cameraOn: true,
-      },
-      remoteConfig: {
-        shareScreenOn: false,
-        microphoneOn: true,
-        cameraOn: true,
-      },
-    };
+    this.state = { ready: false };
     this.mainVideo = React.createRef();
     this.smallVideo1 = React.createRef();
     this.smallVideo2 = React.createRef();
@@ -44,17 +45,19 @@ export default class Home extends React.Component {
 
   componentDidMount() {
     const { roomCode, userId } = this.state;
-    this.createPeerClient({ roomCode, userId });
+    this.listenPeerClient({ roomCode, userId });
   }
 
-  componentWillUnmount() {
-    this.peerClient.destroy();
-  }
-
-  createPeerClient = ({ roomCode, userId }) => {
-    const peerClient = new PeerClient({ roomCode, userId });
-    peerClient.on('join-success', ({ user }) => {
-      this.setState({ currentUser: user });
+  listenPeerClient = () => {
+    peerClient.on('join-success', ({ user, room }) => {
+      const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
+      const userConfig = LocalStorage.loadUserConfig(user.id);
+      if (userConfig) {
+        setCamera(userConfig.cameraOn);
+        setMicrophone(userConfig.microphoneOn);
+      }
+      setRoom(room);
+      setCurrentUser(user);
     });
     peerClient.on('ready', () => {
       this.setState({ ready: true });
@@ -63,100 +66,88 @@ export default class Home extends React.Component {
       this.smallVideo1.current.srcObject = stream;
     });
     peerClient.on('local-screen-stream', () => {
-      const { localConfig } = this.state;
-      localConfig.shareScreenOn = true;
-      this.setState({ localConfig });
+      const { setShareScreen } = this.props;
+      setShareScreen(true);
     });
     peerClient.on('local-screen-stream-ended', () => {
-      const { localConfig } = this.state;
-      localConfig.shareScreenOn = false;
-      this.setState({ localConfig });
+      const { setShareScreen } = this.props;
+      setShareScreen(false);
     });
     peerClient.on('remote-camera-stream', (stream) => {
       this.mainVideo.current.srcObject = stream;
+      this.mainVideo.current.style.backgroundColor = '#000';
     });
     peerClient.on('remote-screen-stream', (stream) => {
       this.smallVideo2.current.srcObject = this.mainVideo.current.srcObject;
       this.mainVideo.current.srcObject = stream;
+      const { setPartnerShareScreen } = this.props;
+      setPartnerShareScreen(true);
     });
     peerClient.on('remote-screen-stream-ended', () => {
       this.mainVideo.current.srcObject = this.smallVideo2.current.srcObject;
       this.smallVideo2.current.srcObject = null;
+      const { setPartnerShareScreen } = this.props;
+      setPartnerShareScreen(false);
     });
     peerClient.on('remote-camera-on', () => {
-      const { remoteConfig } = this.state;
-      remoteConfig.cameraOn = true;
-      this.setState({ remoteConfig });
+      const { setPartnerCamera } = this.props;
+      setPartnerCamera(true);
     });
     peerClient.on('remote-camera-off', () => {
-      const { remoteConfig } = this.state;
-      remoteConfig.cameraOn = false;
-      this.setState({ remoteConfig });
+      const { setPartnerCamera } = this.props;
+      setPartnerCamera(false);
     });
     peerClient.on('remote-microphone-on', () => {
-      const { remoteConfig } = this.state;
-      remoteConfig.microphoneOn = true;
-      this.setState({ remoteConfig });
+      const { setPartnerMicrophone } = this.props;
+      setPartnerMicrophone(true);
     });
     peerClient.on('remote-microphone-off', () => {
-      const { remoteConfig } = this.state;
-      remoteConfig.microphoneOn = false;
-      this.setState({ remoteConfig });
+      const { setPartnerMicrophone } = this.props;
+      setPartnerMicrophone(false);
     });
     peerClient.on('toast', (message) => {
       toast[message.type](message.content);
     });
     peerClient.on('join-error', (error) => {
-      this.setState({ error });
+      const { setError } = this.props;
+      setError(error);
     });
     peerClient.on('partner-leave', () => {
-      this.setState({ hasPartner: false });
+      const { setPartner } = this.props;
+      setPartner(null);
       this.mainVideo.current.srcObject = null;
+      this.mainVideo.current.style.backgroundColor = 'transparent';
       this.smallVideo2.current.srcObject = null;
     });
-    peerClient.on('partner-join', () => {
-      this.setState({ hasPartner: true });
+    peerClient.on('partner-join', (partner) => {
+      const { setPartner } = this.props;
+      setPartner(partner);
     });
-    peerClient.on('chat-message', (newMessages) => {
-      const { messages } = this.state;
-      this.setState({ messages: _.concat(messages, newMessages) });
-    });
-    this.peerClient = peerClient;
   }
 
   toggleMicrophone = () => {
-    const { localConfig } = this.state;
-    localConfig.microphoneOn = !localConfig.microphoneOn;
-    this.setState({ localConfig }, () => {
-      this.peerClient.mute(localConfig.microphoneOn);
-    });
+    const { userConfig, setMicrophone } = this.props;
+    setMicrophone(!userConfig.microphoneOn);
+    peerClient.enableAudio(!userConfig.microphoneOn);
   }
 
   toggleCamera = () => {
-    const { localConfig } = this.state;
-    localConfig.cameraOn = !localConfig.cameraOn;
-    this.setState({ localConfig }, () => {
-      this.peerClient.enableVideo(localConfig.cameraOn);
-    });
+    const { userConfig, setCamera } = this.props;
+    setCamera(!userConfig.cameraOn);
+    peerClient.enableVideo(!userConfig.cameraOn);
   }
 
   toggleShareScreen = () => {
-    const { localConfig } = this.state;
-    if (localConfig.shareScreenOn) {
-      this.peerClient.removeShareScreen();
+    const { userConfig } = this.props;
+    if (userConfig.shareScreenOn) {
+      peerClient.removeShareScreen();
     } else {
-      this.peerClient.requestShareScreen();
+      peerClient.requestShareScreen();
     }
   }
 
-  sendMessage = (text) => {
-    this.peerClient.sendMessage(text);
-  }
-
   renderHeader = () => {
-    const {
-      localConfig,
-    } = this.state;
+    const { userConfig } = this.props;
     return (
       <div className="header">
         <div className="header-left">
@@ -169,14 +160,14 @@ export default class Home extends React.Component {
             <div className="controls">
               <Button
                 color="transparent"
-                className={classnames({ active: localConfig.microphoneOn })}
+                className={classnames({ active: userConfig.microphoneOn })}
                 onClick={this.toggleMicrophone}
               >
                 <i className="icon-microphone" />
               </Button>
               <Button
                 color="transparent"
-                className={classnames({ active: localConfig.cameraOn })}
+                className={classnames({ active: userConfig.cameraOn })}
                 onClick={this.toggleCamera}
               >
                 <i className="icon-camrecorder" />
@@ -194,7 +185,7 @@ export default class Home extends React.Component {
         <div className="header-right">
           <Button
             color="transparent"
-            className={classnames({ active: localConfig.shareScreenOn })}
+            className={classnames({ active: userConfig.shareScreenOn })}
             onClick={this.toggleShareScreen}
           >
             <i className="icon-screen-desktop" />
@@ -205,14 +196,12 @@ export default class Home extends React.Component {
   }
 
   render() {
+    const { ready } = this.state;
     const {
-      ready,
-      hasPartner,
-      remoteConfig,
       error,
-      currentUser,
-      messages,
-    } = this.state;
+      hasPartner,
+      partnerConfig,
+    } = this.props;
     return (
       <div className={classnames('home-page')}>
         <div className={classnames('content-wrapper')}>
@@ -227,23 +216,19 @@ export default class Home extends React.Component {
               <div className={classnames('controls', { 'd-none': !hasPartner })}>
                 <Button
                   color="transparent"
-                  className={classnames({ active: remoteConfig.microphoneOn })}
+                  className={classnames({ active: partnerConfig.microphoneOn })}
                 >
                   <i className="icon-microphone" />
                 </Button>
                 <Button
                   color="transparent"
-                  className={classnames({ active: remoteConfig.cameraOn })}
+                  className={classnames({ active: partnerConfig.cameraOn })}
                 >
                   <i className="icon-camrecorder" />
                 </Button>
               </div>
             </div>
-            <Sidebar
-              currentUser={currentUser}
-              messages={messages}
-              onSendMessage={this.sendMessage}
-            />
+            <Sidebar />
           </div>
         </div>
         <div className={classnames('waitting-ready', { 'd-none': ready })}>
@@ -259,3 +244,25 @@ export default class Home extends React.Component {
     );
   }
 }
+
+const mapStateToProps = (state) => ({
+  error: state.error.message,
+  hasPartner: !!state.partner.profile,
+  userConfig: state.userConfig,
+  partnerConfig: state.partnerConfig,
+});
+
+const mapDispatchToProps = (dispatch) => bindActionCreators({
+  setError: errorActions.setError,
+  setPartner: partnerActions.setPartner,
+  setRoom: roomActions.setRoom,
+  setCurrentUser: userActions.setCurrentUser,
+  setCamera: userConfigActions.setCamera,
+  setMicrophone: userConfigActions.setMicrophone,
+  setShareScreen: userConfigActions.setShareScreen,
+  setPartnerCamera: partnerConfigActions.setCamera,
+  setPartnerMicrophone: partnerConfigActions.setMicrophone,
+  setPartnerShareScreen: partnerConfigActions.setShareScreen,
+}, dispatch);
+
+export default connect(mapStateToProps, mapDispatchToProps)(Home);
