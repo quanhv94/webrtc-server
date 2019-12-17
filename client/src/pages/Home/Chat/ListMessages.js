@@ -21,13 +21,12 @@ class ListMessages extends React.Component {
     const lastOldMessageId = _.get(_.last(oldMessages), 'id');
     const lastNewMessageId = _.get(_.last(newMessages), 'id');
     if (lastOldMessageId !== lastNewMessageId.id) {
-      this.bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+      this.bottomRef.current.scrollIntoView();
     }
   }
 
   render() {
     const { messages, currentUser } = this.props;
-    console.log(messages, currentUser);
     return (
       <div className="content" ref={this.ref}>
         <div className="message-list">

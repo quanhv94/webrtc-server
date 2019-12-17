@@ -21,6 +21,8 @@ class Home extends React.Component {
   static propTypes = {
     setError: PropTypes.func.isRequired,
     error: PropTypes.string.isRequired,
+    room: PropTypes.object.isRequired,
+    currentUser: PropTypes.object,
     hasPartner: PropTypes.bool.isRequired,
     setPartner: PropTypes.func.isRequired,
     userConfig: PropTypes.object.isRequired,
@@ -33,6 +35,10 @@ class Home extends React.Component {
     setPartnerCamera: PropTypes.func.isRequired,
     setPartnerMicrophone: PropTypes.func.isRequired,
     setPartnerShareScreen: PropTypes.func.isRequired,
+  }
+
+  static defaultProps = {
+    currentUser: null,
   }
 
   constructor(props) {
@@ -147,7 +153,7 @@ class Home extends React.Component {
   }
 
   renderHeader = () => {
-    const { userConfig } = this.props;
+    const { userConfig, room, currentUser } = this.props;
     return (
       <div className="header">
         <div className="header-left">
@@ -182,6 +188,10 @@ class Home extends React.Component {
               autoPlay
             />
           </div>
+        </div>
+        <div className="header-center">
+          <h4>{room.name}</h4>
+          <div>{`Hi, ${currentUser && currentUser.full_name}`}</div>
         </div>
         <div className="header-right">
           <Button
@@ -248,6 +258,8 @@ class Home extends React.Component {
 
 const mapStateToProps = (state) => ({
   error: state.error.message,
+  room: state.room,
+  currentUser: state.user.profile,
   hasPartner: !!state.partner.profile,
   userConfig: state.userConfig,
   partnerConfig: state.partnerConfig,

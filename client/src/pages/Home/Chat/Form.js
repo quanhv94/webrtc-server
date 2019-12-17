@@ -45,7 +45,7 @@ export default class Form extends React.Component {
           </Button>
           <Input
             type="text"
-            placeholder="Tin nhắn ..."
+            placeholder="Type message..."
             value={text}
             onChange={this.onChange}
             onKeyDown={this.onKeyDown}

@@ -41,11 +41,12 @@
     }
     .header {
       background-color: #17425b;
-      // border: 2px #fff solid;
       display: flex;
       justify-content: space-between;
       .header-left {
         display: flex;
+        min-width: 200px;
+        // background-color: yellow;
         .local-camera, .remote-camera {
           position: relative;
             padding: 5px 10px;
@@ -77,10 +78,22 @@
           }
         }
       }
+      .header-center {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex: 1;
+        // background-color: red;
+        color: #fff;
+        text-align: center;
+      }
       .header-right {
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         padding: 0 20px;
+        min-width: 200px;
+        // background-color: green;
         button {
           color: #fff;
           box-shadow: none;
@@ -111,10 +124,9 @@
   .waitting-partner-message {
     pointer-events: none;
     position: fixed;
-    left: 0;
-    top: 18px;
+    left: 10px;
+    top: 90px;
     width: 100%;
-    text-align: center;
     p {
       background-color: rgba(255,255,255,.8);
       display: inline-block;

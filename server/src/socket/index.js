@@ -4,15 +4,20 @@ import uuid from 'uuid/v4';
 import request from 'request-promise';
 
 const checkRoom = async ({ domain, roomCode, token, role }) => {
-  console.log(domain, roomCode, token, role);
-  if (roomCode === 'rabita') {
+  if (roomCode.startsWith('rabita') && ['1', '2'].includes(token)) {
     return {
       room: {
         id: 100,
-        name: 'Lớp học bla bla',
+        name: 'Lớp học vui vẻ',
         description: 'Đây là mô tả room',
       },
-      user: { full_name: token, user_id: token },
+      user: {
+        user_id: token,
+        full_name: token === 1 ? 'Teacher Ben' : 'Nguyen Duy Hieu',
+        email: 'ben@rabita.vn',
+        phone_number: '0987878787',
+        role: token === 1 ? 'TEACHER' : 'STUDENT',
+      },
     };
   }
   try {
