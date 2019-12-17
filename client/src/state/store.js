@@ -16,7 +16,7 @@ store.subscribe(() => {
   const state = store.getState();
   const user = state.user.profile;
   if (user) {
-    LocalStorage.saveUserConfig(user.id, state.userConfig);
+    LocalStorage.saveUserConfig(user.user_id, state.userConfig);
   }
 });
 export default store;

@@ -51,7 +51,7 @@ class Home extends React.Component {
   listenPeerClient = () => {
     peerClient.on('join-success', ({ user, room }) => {
       const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
-      const userConfig = LocalStorage.loadUserConfig(user.id);
+      const userConfig = LocalStorage.loadUserConfig(user.user_id);
       if (userConfig) {
         setCamera(userConfig.cameraOn);
         setMicrophone(userConfig.microphoneOn);

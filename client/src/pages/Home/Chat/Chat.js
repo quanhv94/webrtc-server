@@ -1,13 +1,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import moment from 'moment';
-import classnames from 'classnames';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import actions from '../../../state/chat/actions';
 import peerClient from '../../../util/WebRTCClient';
 import Form from './Form';
 import './style.scss';
+import ListMessages from './ListMessages';
 
 class ChatBox extends React.Component {
   static propTypes = {
@@ -36,24 +35,7 @@ class ChatBox extends React.Component {
     if (!currentUser) return null;
     return (
       <div className="chatbox">
-        <div className="content">
-          <div className="message-list">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={classnames({
-                  item: true,
-                  log: message.type === 'LOG',
-                  incoming: message.sender && currentUser.id !== message.sender.id && message.type !== 'LOG',
-                  outgoing: message.sender && currentUser.id === message.sender.id && message.type !== 'LOG',
-                })}
-              >
-                <div className="timeline">{moment(message.time).fromNow()}</div>
-                <div className="bubble">{message.content}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ListMessages messages={messages} currentUser={currentUser} />
         <Form onSendMessage={this.sendMessage} />
       </div>
     );

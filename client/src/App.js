@@ -33,7 +33,7 @@ const App = () => (
         <Router history={history}>
           <Switch>
             <Route exact path="/" component={Login} />
-            <Route exact path="/:roomCode/:userId" component={Home} />
+            <Route exact path="*" component={Home} />
             <Redirect to="/" />
           </Switch>
         </Router>

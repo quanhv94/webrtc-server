@@ -55,19 +55,18 @@ const getDisplayMedia = () => {
 };
 
 class PeerClient extends EventEmitter {
-  constructor({ roomCode, userId }) {
+  constructor({ domain, token, roomCode, role }) {
     super();
-    if (!roomCode || !userId) return;
+    if (!domain || !token || !roomCode) return;
     this.roomCode = roomCode;
-    this.userId = userId;
     this.cameraOn = true;
     this.microphoneOn = true;
     socket.addEventListener('rtc-signal', (data) => {
-      if (data.senderId !== this.userId) {
+      if (data.senderId !== this.user.user_id) {
         this.peer.signal(data.signal);
       }
     });
-    socket.emit('join', { roomCode, userId });
+    socket.emit('join', { domain, token, roomCode, role });
     socket.once('join-success', ({ user, room }) => {
       this.emit('join-success', { user, room });
       this.user = user;
@@ -85,7 +84,7 @@ class PeerClient extends EventEmitter {
       this.playSoundEffect('join');
     });
     socket.on('make-peer', ({ callerId }) => {
-      this.makePeer({ initiator: callerId === this.userId });
+      this.makePeer({ initiator: callerId === this.user.user_id });
     });
     socket.on('join-error', (error) => {
       this.emit('join-error', error);
@@ -111,7 +110,7 @@ class PeerClient extends EventEmitter {
         this.localCameraStream = await getUserMedia();
         this.emit('ready');
         this.emit('local-camera-stream', this.localCameraStream);
-        const userConfig = LocalStorage.loadUserConfig(this.user.id);
+        const userConfig = LocalStorage.loadUserConfig(this.user.user_id);
         if (userConfig) {
           this.localCameraStream.getVideoTracks()[0].enabled = userConfig.cameraOn;
           this.cameraOn = userConfig.cameraOn;
@@ -137,7 +136,7 @@ class PeerClient extends EventEmitter {
     this.peer.on('signal', (signal) => {
       socket.emit('rtc-signal', {
         roomCode: this.roomCode,
-        senderId: this.userId,
+        senderId: this.user.user_id,
         signal,
       });
     });
@@ -149,7 +148,7 @@ class PeerClient extends EventEmitter {
           this.peer.addStream(this.localScreenStream);
         }
       }
-      this.send(`greeting from ${this.userId}`);
+      this.send('greeting from your partner');
       this.sendConfig();
     });
 
@@ -283,6 +282,11 @@ class PeerClient extends EventEmitter {
 
 const { pathname } = window.location;
 const params = pathname.split('/');
-const peerClient = new PeerClient({ roomCode: params[1], userId: params[2] });
+const peerClient = new PeerClient({
+  domain: window.atob(params[1]),
+  token: params[2],
+  roomCode: params[3],
+  role: params[4],
+});
 
 export default peerClient;

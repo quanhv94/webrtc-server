@@ -3,19 +3,21 @@ import moment from 'moment';
 import uuid from 'uuid/v4';
 import request from 'request-promise';
 
-const checkRoom = async ({ roomCode, userId }) => {
+const checkRoom = async ({ domain, roomCode, token, role }) => {
+  console.log(domain, roomCode, token, role);
   if (roomCode === 'rabita') {
     return {
       room: {
         id: 100,
         description: 'Đây là mô tả room',
       },
-      user: { full_name: userId, id: userId },
+      user: { full_name: token, user_id: token },
     };
   }
   try {
+    const uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
     const response = await request({
-      uri: `http://test.e-school.rabita.vn:80/api/v1/meeting-room/room-data?roomCode=${roomCode}&userId=${userId}`,
+      uri,
       json: true,
     });
     const { data } = response;
@@ -23,7 +25,13 @@ const checkRoom = async ({ roomCode, userId }) => {
       const { message } = data;
       return { error: message };
     }
-    const { user, room } = data.data;
+    const { user, configs, lecture } = data.data;
+    const room = {
+      configs,
+      name: lecture.class.name,
+      description: lecture.class.description,
+      chatRoomConfig: lecture.chatRoomConfig,
+    };
     return { user, room };
   } catch {
     return { error: 'Can not connect to server' };
@@ -35,13 +43,14 @@ const rooms = {};
 const setupSocket = (server) => {
   const io = socketIO(server);
   io.on('connection', (socket) => {
-    socket.on('join', async ({ roomCode, userId }) => {
+    socket.on('join', async ({ domain, token, roomCode, role }) => {
       rooms[roomCode] = rooms[roomCode] || {};
-      const { user, room, error } = await checkRoom({ roomCode, userId });
+      const { user, room, error } = await checkRoom({ domain, token, roomCode, role });
       if (error) {
         socket.emit('join-error', error);
         return;
       }
+      const userId = user.user_id;
 
       if (rooms[roomCode][userId]) {
         socket.emit('join-error', 'You logged in at another browser');
@@ -64,12 +73,12 @@ const setupSocket = (server) => {
     });
 
     const leave = () => {
-      const { roomCode, userId } = socket;
+      const { roomCode, userId, user } = socket;
       if (rooms[roomCode] && rooms[roomCode][userId]) {
         delete rooms[roomCode][userId];
         socket.leave(roomCode);
         io.to(roomCode).emit('partner-leave', userId);
-        io.to(roomCode).emit('toast', { type: 'error', content: `${userId} leaved` });
+        io.to(roomCode).emit('toast', { type: 'error', content: `${user.full_name} leaved` });
       }
     };
 
