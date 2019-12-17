@@ -9,6 +9,7 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
     return {
       room: {
         id: 100,
+        name: 'Lớp học bla bla',
         description: 'Đây là mô tả room',
       },
       user: { full_name: token, user_id: token },

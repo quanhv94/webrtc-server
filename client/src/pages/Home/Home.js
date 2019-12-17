@@ -156,6 +156,7 @@ class Home extends React.Component {
               ref={this.smallVideo1}
               playsInline
               autoPlay
+              muted
             />
             <div className="controls">
               <Button
