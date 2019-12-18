@@ -67,10 +67,14 @@ class PeerClient extends EventEmitter {
       }
     });
     socket.emit('join', { domain, token, roomCode, role });
-    socket.once('join-success', ({ user, room }) => {
-      this.emit('join-success', { user, room });
+    socket.once('join-success', ({ user, room, storageConfig, chatRoomConfig, currentTime }) => {
+      this.emit('join-success', { user, room, storageConfig, chatRoomConfig, currentTime });
       this.user = user;
+      this.room = room;
+      this.storageConfig = storageConfig;
+      this.chatRoomConfig = chatRoomConfig;
       this.getCameraStream();
+      console.log(room);
     });
     socket.on('partner-leave', () => {
       this.remoteCameraStream = null;
@@ -94,6 +98,9 @@ class PeerClient extends EventEmitter {
     });
     socket.on('chat-message', (messages) => {
       this.emit('chat-message', messages);
+    });
+    socket.on('disconnect', () => {
+      this.emit('join-error', 'Disconnected');
     });
   }
 
@@ -211,15 +218,12 @@ class PeerClient extends EventEmitter {
     try {
       const localScreenStream = await getDisplayMedia();
       this.localScreenStream = localScreenStream;
-      localScreenStream.getTracks()[0].addEventListener('ended', () => {
-        this.localScreenStream = null;
-        this.emit('local-screen-stream-ended');
-        this.send('remote-screen-stream-ended');
-      });
+      localScreenStream.getTracks()[0].addEventListener('ended', this.removeShareScreen);
       this.emit('local-screen-stream', localScreenStream);
       if (this.peer) {
         this.peer.addStream(localScreenStream);
       }
+      this.sendMessage(`${this.user.full_name} start share screen`, 'LOG');
     } catch (error) {
       this.emit('toast', { type: 'error', content: 'Can not access display' });
     }
@@ -230,6 +234,7 @@ class PeerClient extends EventEmitter {
     this.emit('local-screen-stream-ended');
     this.send('remote-screen-stream-ended');
     this.localScreenStream = null;
+    this.sendMessage(`${this.user.full_name} stop share screen`, 'LOG');
   }
 
   requestRecordScreenStream = async () => {

@@ -1,6 +1,5 @@
 import socketIO from 'socket.io';
 import moment from 'moment';
-import uuid from 'uuid/v4';
 import request from 'request-promise';
 
 const checkRoom = async ({ domain, roomCode, token, role }) => {
@@ -22,6 +21,7 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
   }
   try {
     const uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
+    console.log(uri);
     const response = await request({
       uri,
       json: true,
@@ -31,14 +31,17 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
       const { message } = data;
       return { error: message };
     }
-    const { user, configs, lecture } = data.data;
+    const { user, configs, lecture, instance } = data.data;
+    const { storageConfig, chatRoomConfig } = lecture;
     const room = {
       configs,
       name: lecture.class.name,
       description: lecture.class.description,
-      chatRoomConfig: lecture.chatRoomConfig,
+      plan_start_datetime: lecture.plan_start_datetime,
+      plan_duration: lecture.plan_start_datetime,
+      instance,
     };
-    return { user, room };
+    return { user, room, storageConfig, chatRoomConfig };
   } catch {
     return { error: 'Can not connect to server' };
   }
@@ -51,7 +54,8 @@ const setupSocket = (server) => {
   io.on('connection', (socket) => {
     socket.on('join', async ({ domain, token, roomCode, role }) => {
       rooms[roomCode] = rooms[roomCode] || {};
-      const { user, room, error } = await checkRoom({ domain, token, roomCode, role });
+      const roomData = await checkRoom({ domain, token, roomCode, role });
+      const { user, room, storageConfig, chatRoomConfig, error } = roomData;
       if (error) {
         socket.emit('join-error', error);
         return;
@@ -66,9 +70,12 @@ const setupSocket = (server) => {
         socket.roomCode = roomCode;
         socket.userId = userId;
         socket.user = user;
+        socket.room = room;
+        socket.storageConfig = storageConfig;
+        socket.chatRoomConfig = chatRoomConfig;
         socket.join(roomCode);
         rooms[roomCode][userId] = socket.id;
-        socket.emit('join-success', { user, room });
+        socket.emit('join-success', { user, room, storageConfig, chatRoomConfig, currentTime: moment().format() });
         socket.emit('toast', { type: 'success', content: `Hello ${user.full_name}` });
         socket.to(roomCode).broadcast.emit('toast', { type: 'success', content: `${user.full_name} joined` });
         if (Object.keys(rooms[roomCode]).length >= 2) {
@@ -94,9 +101,8 @@ const setupSocket = (server) => {
       io.in(socket.roomCode).emit('rtc-signal', data);
     });
     socket.on('chat-message', (message) => {
-      message.id = uuid();
-      message.sender = socket.user;
-      message.time = moment().format();
+      message.sentAt = moment().format();
+      message.sender = socket.chatRoomConfig.sender;
       io.in(socket.roomCode).emit('chat-message', message);
     });
   });

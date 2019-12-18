@@ -20,7 +20,7 @@ class ListMessages extends React.Component {
     const { messages: newMessages } = this.props;
     const lastOldMessageId = _.get(_.last(oldMessages), 'id');
     const lastNewMessageId = _.get(_.last(newMessages), 'id');
-    if (lastOldMessageId !== lastNewMessageId.id) {
+    if (lastOldMessageId !== lastNewMessageId) {
       this.bottomRef.current.scrollIntoView();
     }
   }
@@ -40,7 +40,7 @@ class ListMessages extends React.Component {
                 outgoing: message.sender && currentUser.user_id === message.sender.user_id && message.type !== 'LOG',
               })}
             >
-              <div className="timeline">{moment(message.time).fromNow()}</div>
+              <div className="timeline">{moment(message.sentAt).fromNow()}</div>
               <div className="bubble">{message.content}</div>
             </div>
           ))}

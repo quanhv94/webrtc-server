@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
+import _ from 'lodash';
 import { Button } from 'reactstrap';
 import { toast } from 'react-toastify';
 import peerClient from '../../util/WebRTCClient';
@@ -16,6 +17,7 @@ import userConfigActions from '../../state/userConfig/actions';
 import partnerConfigActions from '../../state/partnerConfig/actions';
 import './style.scss';
 import LocalStorage from '../../util/LocalStorage';
+import Clock from '../../components/Clock';
 
 class Home extends React.Component {
   static propTypes = {
@@ -43,7 +45,10 @@ class Home extends React.Component {
 
   constructor(props) {
     super(props);
-    this.state = { ready: false };
+    this.state = {
+      ready: false,
+      time: null,
+    };
     this.mainVideo = React.createRef();
     this.smallVideo1 = React.createRef();
     this.smallVideo2 = React.createRef();
@@ -55,8 +60,9 @@ class Home extends React.Component {
   }
 
   listenPeerClient = () => {
-    peerClient.on('join-success', ({ user, room }) => {
+    peerClient.on('join-success', ({ user, room, currentTime }) => {
       const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
+      this.setState({ time: currentTime });
       const userConfig = LocalStorage.loadUserConfig(user.user_id);
       if (userConfig) {
         setCamera(userConfig.cameraOn);
@@ -190,7 +196,7 @@ class Home extends React.Component {
           </div>
         </div>
         <div className="header-center">
-          <h4>{room.name}</h4>
+          <h4>{`${_.get(room, 'instance.instance_name')}-${room.name}`}</h4>
           <div>{`Hi, ${currentUser && currentUser.full_name}`}</div>
         </div>
         <div className="header-right">
@@ -207,7 +213,7 @@ class Home extends React.Component {
   }
 
   render() {
-    const { ready } = this.state;
+    const { ready, time } = this.state;
     const {
       error,
       hasPartner,
@@ -242,6 +248,11 @@ class Home extends React.Component {
             <Sidebar />
           </div>
         </div>
+        {time && (
+          <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
+            <Clock initialTime={time} />
+          </div>
+        )}
         <div className={classnames('waitting-ready', { 'd-none': ready })}>
           <h4>Please wait ...</h4>
         </div>
@@ -251,7 +262,7 @@ class Home extends React.Component {
         <div className={classnames('waitting-partner-message', { 'd-none': hasPartner })}>
           <p>Please wait for your partner</p>
         </div>
-      </div>
+      </div >
     );
   }
 }
