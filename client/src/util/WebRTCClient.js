@@ -1,5 +1,10 @@
 import Peer from 'simple-peer';
 import EventEmitter from 'eventemitter3';
+import firebase from 'firebase/app';
+import 'firebase/database';
+import axios from 'axios';
+import _ from 'lodash';
+import moment from 'moment';
 import socket from '../socket/index';
 import LocalStorage from './LocalStorage';
 
@@ -67,14 +72,16 @@ class PeerClient extends EventEmitter {
       }
     });
     socket.emit('join', { domain, token, roomCode, role });
-    socket.once('join-success', ({ user, room, storageConfig, chatRoomConfig, currentTime }) => {
-      this.emit('join-success', { user, room, storageConfig, chatRoomConfig, currentTime });
+    socket.once('join-success', ({ user, room, storageConfig, chatRoomConfig, toolConfig, currentTime }) => {
+      this.emit('join-success', { user, room, storageConfig, chatRoomConfig, toolConfig, currentTime });
       this.user = user;
       this.room = room;
       this.storageConfig = storageConfig;
       this.chatRoomConfig = chatRoomConfig;
+      this.toolConfig = toolConfig;
       this.getCameraStream();
-      console.log(room);
+      this.initFilebaseChat();
+      this.initFilebaseNote();
     });
     socket.on('partner-leave', () => {
       this.remoteCameraStream = null;
@@ -96,12 +103,82 @@ class PeerClient extends EventEmitter {
     socket.on('toast', (message) => {
       this.emit('toast', message);
     });
-    socket.on('chat-message', (messages) => {
-      this.emit('chat-message', messages);
-    });
+    // socket.on('chat-message', (messages) => {
+    //   this.emit('chat-message', messages);
+    // });
     socket.on('disconnect', () => {
       this.emit('join-error', 'Disconnected');
     });
+  }
+
+  uploadFile = (file, prefix = 'upload') => new Promise((resolve, reject) => {
+    const key = `${prefix}/${Date.now()}_${file.name.replace(/[^A-z0-9.]/g, '_')}`;
+    socket.emit('request-s3-presigned-url', { key });
+    socket.once(`success-s3-presigned-url_${key}`, ({ presignedUrl, path }) => {
+      axios.put(presignedUrl, file)
+        .then(() => resolve(path))
+        .catch(reject);
+    });
+    socket.once(`error-s3-presigned-url_${key}`, reject);
+  })
+
+  initFilebaseChat = () => {
+    this.firebaseChat = firebase.initializeApp(this.chatRoomConfig.firebase, 'chat');
+    // const userInboxRef = firebase.database().ref(this.chatRoomConfig.sender.userInboxRef);
+    // userInboxRef.on('value', (snapshot) => {
+    //   this.emit('chat-total-unread', _.get(snapshot.val(), 'totalUnread', 0));
+    // });
+
+    const roomMessageRef = this.firebaseChat.database().ref(this.chatRoomConfig.roomMessageRef);
+
+    // get last 500 messages
+    roomMessageRef.limitToLast(500).once('value', (snapshot) => {
+      let messages = snapshot.val();
+      if (!messages) return;
+      messages = Object.keys(messages).map((id) => ({
+        id,
+        ...messages[id],
+      }));
+      this.emit('chat-message', messages);
+    });
+
+    // listen for new message
+    let childAddedFlag = true;
+    roomMessageRef.limitToLast(1).on('child_added', (snapshot) => {
+      if (childAddedFlag === true) {
+        childAddedFlag = false;
+        return;
+      }
+      const message = snapshot.val();
+      message.id = snapshot.key;
+      this.emit('chat-message', message);
+    });
+  }
+
+  initFilebaseNote = async () => {
+    const { REALTIME_NOTE } = this.toolConfig;
+    this.firebaseNote = firebase.initializeApp(REALTIME_NOTE.firebase, 'note');
+    const { noteRefs } = REALTIME_NOTE;
+    this.emit('set-notes', noteRefs);
+    noteRefs.forEach((noteRef) => {
+      const ref = this.firebaseNote.database().ref(noteRef.noteRef);
+      ref.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.content) {
+          this.emit('update-note', { userId: noteRef.userId, content: data.content });
+        }
+      });
+    });
+  }
+
+  updateNoteContent = (content) => {
+    const { REALTIME_NOTE } = this.toolConfig;
+    const { noteRefs } = REALTIME_NOTE;
+    const noteRef = _.find(noteRefs, (x) => x.userId === this.user.user_id);
+    if (noteRef) {
+      const ref = this.firebaseNote.database().ref(noteRef.noteRef);
+      ref.update({ content });
+    }
   }
 
   playSoundEffect = (name) => {
@@ -262,11 +339,37 @@ class PeerClient extends EventEmitter {
     this.send(`remote-microphone-${this.microphoneOn ? 'on' : 'off'}`);
   }
 
-  sendMessage = (content, type = 'TEXT') => {
-    socket.emit('chat-message', {
+  sendMessage = (content, file = null, type = 'TEXT') => {
+    const roomMessageRef = this.firebaseChat.database().ref(this.chatRoomConfig.roomMessageRef);
+    roomMessageRef.push({
+      sender: this.chatRoomConfig.sender,
       type,
       content,
+      file,
+      sentAt: moment().format(),
     });
+    // this.increaseChatTotalUnread();
+  }
+
+  // increaseChatTotalUnread = () => {
+  //   this.chatRoomConfig.roomMembers.forEach((member) => {
+  //     if (member.user_id === this.user.user_id) return;
+  //     const ref = firebase.database().ref(member.userInboxRef);
+  //     ref.child('/totalUnread').once('value', (snapshot) => {
+  //       const totalUnread = snapshot.val() || 0;
+  //       ref.update({
+  //         totalUnread: totalUnread + 1,
+  //         updatedAt: moment().format(),
+  //       });
+  //     });
+  //   });
+  // }
+
+  resetTotalUnread = () => {
+    // firebase.database().ref(this.chatRoomConfig.sender.userInboxRef).update({
+    //   updatedAt: moment().format(),
+    //   totalUnread: 0,
+    // });
   }
 
   destroy = () => {

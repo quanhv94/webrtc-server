@@ -18,7 +18,6 @@ class Clock extends React.Component {
     this.state = {
       time: moment(props.initialTime),
     };
-    console.log(props.initialTime)
   }
 
   componentDidMount() {

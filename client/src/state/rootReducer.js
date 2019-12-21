@@ -10,6 +10,7 @@ import userConfigReducer from './userConfig/reducer';
 import errorReducer from './error/reducer';
 import roomReducer from './room/reducer';
 import sidebarReducer from './sidebar/reducer';
+import noteReducer from './note/reducer';
 
 const rootReducer = combineReducers({
   form: formReducer,
@@ -23,6 +24,7 @@ const rootReducer = combineReducers({
   error: errorReducer,
   room: roomReducer,
   sidebar: sidebarReducer,
+  note: noteReducer,
 });
 
 export default rootReducer;

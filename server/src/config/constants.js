@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const constants = {
+const Constants = {
   appName: 'RabiKnow',
   env: process.env.ENV,
   jwtKey: `rabiknow-${process.env.ENV}`,
@@ -26,4 +26,4 @@ const constants = {
   },
 };
 
-export default constants;
+export default Constants;

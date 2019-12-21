@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import classnames from 'classnames';
 import _ from 'lodash';
 import { Button } from 'reactstrap';
+import moment from 'moment';
 import { toast } from 'react-toastify';
 import peerClient from '../../util/WebRTCClient';
 import Sidebar from './Sidebar/Sidebar';
@@ -18,6 +19,7 @@ import partnerConfigActions from '../../state/partnerConfig/actions';
 import './style.scss';
 import LocalStorage from '../../util/LocalStorage';
 import Clock from '../../components/Clock';
+import CountDownTimer from '../../components/CountDownTimer';
 
 class Home extends React.Component {
   static propTypes = {
@@ -48,6 +50,7 @@ class Home extends React.Component {
     this.state = {
       ready: false,
       time: null,
+      endingTime: null,
     };
     this.mainVideo = React.createRef();
     this.smallVideo1 = React.createRef();
@@ -55,14 +58,16 @@ class Home extends React.Component {
   }
 
   componentDidMount() {
-    const { roomCode, userId } = this.state;
-    this.listenPeerClient({ roomCode, userId });
+    this.listenPeerClient();
   }
 
   listenPeerClient = () => {
     peerClient.on('join-success', ({ user, room, currentTime }) => {
       const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
-      this.setState({ time: currentTime });
+      this.setState({
+        time: currentTime,
+        endingTime: moment(room.plan_start_datetime).add(room.plan_duration, 'minute'),
+      });
       const userConfig = LocalStorage.loadUserConfig(user.user_id);
       if (userConfig) {
         setCamera(userConfig.cameraOn);
@@ -158,6 +163,11 @@ class Home extends React.Component {
     }
   }
 
+  onTimeout = () => {
+    peerClient.destroy();
+    toast.error('Time is over');
+  }
+
   renderHeader = () => {
     const { userConfig, room, currentUser } = this.props;
     return (
@@ -213,7 +223,11 @@ class Home extends React.Component {
   }
 
   render() {
-    const { ready, time } = this.state;
+    const {
+      ready,
+      time,
+      endingTime,
+    } = this.state;
     const {
       error,
       hasPartner,
@@ -244,15 +258,20 @@ class Home extends React.Component {
                   <i className="icon-camrecorder" />
                 </Button>
               </div>
+              {ready && (
+                <div>
+                  <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
+                    <Clock initialTime={time} />
+                  </div>
+                  <div style={{ position: 'absolute', right: 10, bottom: 10 }}>
+                    <CountDownTimer endingTime={endingTime} onTimeout={this.onTimeout} />
+                  </div>
+                </div>
+              )}
             </div>
             <Sidebar />
           </div>
         </div>
-        {time && (
-          <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
-            <Clock initialTime={time} />
-          </div>
-        )}
         <div className={classnames('waitting-ready', { 'd-none': ready })}>
           <h4>Please wait ...</h4>
         </div>
@@ -262,7 +281,7 @@ class Home extends React.Component {
         <div className={classnames('waitting-partner-message', { 'd-none': hasPartner })}>
           <p>Please wait for your partner</p>
         </div>
-      </div >
+      </div>
     );
   }
 }

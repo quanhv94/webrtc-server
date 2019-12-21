@@ -1,0 +1,23 @@
+.notes-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  .note {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    .note-content {
+      padding: 10px;
+      flex: 1;
+    }
+    textarea {
+      box-shadow: none !important;
+      height: 100%;
+    }
+  }
+}
+.sidebar.large {
+  .notes-container {
+    flex-direction: row;
+  }
+}

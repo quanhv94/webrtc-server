@@ -2,10 +2,12 @@
 import React from 'react';
 import { Button, Input } from 'reactstrap';
 import PropTypes from 'prop-types';
+import Dropzone from 'react-dropzone';
 
 export default class Form extends React.Component {
   static propTypes = {
     onSendMessage: PropTypes.func.isRequired,
+    onSendFile: PropTypes.func.isRequired,
   }
 
   constructor(props) {
@@ -34,15 +36,27 @@ export default class Form extends React.Component {
     onSendMessage(text);
   }
 
+  onSelectFile = (files) => {
+    const file = files[0];
+    if (file) {
+      const { onSendFile } = this.props;
+      onSendFile(file);
+    }
+  }
+
   render() {
     const { text } = this.state;
     return (
       <div className="footer">
         <div className="wrapper">
-          <Button onClick={() => this.fileInput.click()} color="transparent">
-            <i className="fa fa-paperclip" />
-            <input className="d-none" type="file" ref={(ref) => { this.fileInput = ref; }} />
-          </Button>
+          <Dropzone onDrop={this.onSelectFile} multiple={false}>
+            {({ getRootProps, getInputProps }) => (
+              <Button {...getRootProps()} color="transparent">
+                <i className="fa fa-paperclip" />
+                <input {...getInputProps()} />
+              </Button>
+            )}
+          </Dropzone>
           <Input
             type="text"
             placeholder="Type message..."

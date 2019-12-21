@@ -4,6 +4,7 @@ import types from './types';
 
 const initialState = {
   messages: [],
+  totalUnread: 0,
 };
 
 const actions = {
@@ -11,5 +12,9 @@ const actions = {
     const messages = _.concat(state.messages, action.payload);
     return { ...state, messages };
   },
+  [types.SET_TOTAL_UNREAD]: (state, action) => ({
+    ...state,
+    totalUnread: action.payload,
+  }),
 };
 export default handleActions(actions, initialState);

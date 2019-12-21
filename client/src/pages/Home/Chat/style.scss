@@ -2,7 +2,7 @@
 .chatbox {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 128px);;
+  height: calc(100vh - 136px);;
   .content {
     background: #fff;
     border: 1px #ddd solid;
@@ -95,6 +95,13 @@
           color: #fff;
           border-radius: 10px;
           padding: 5px 15px;
+          a {
+            color: #fff;
+            text-decoration: underline;
+          }
+          img {
+            border-radius: 10px;
+          }
         }
         &.log {
           .bubble {

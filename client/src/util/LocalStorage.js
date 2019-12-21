@@ -16,4 +16,21 @@ export default class LocalStorage {
       return undefined;
     }
   }
+
+  static saveSidebarWidth = (width) => {
+    try {
+      localStorage.setItem('sidebarWidth', width);
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  static loadSidebarWidth = () => {
+    try {
+      const width = localStorage.getItem('sidebarWidth');
+      return width;
+    } catch (err) {
+      return undefined;
+    }
+  }
 }

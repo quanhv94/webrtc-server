@@ -1,6 +1,7 @@
 const types = {
   APPEND_MESSAGE: 'APPEND_MESSAGE',
   PREPEND_MESSAGE: 'PREPEND_MESSAGE',
+  SET_TOTAL_UNREAD: 'SET_TOTAL_UNREAD',
 };
 
 export default types;
