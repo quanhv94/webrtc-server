@@ -31,7 +31,7 @@ class ListMessages extends React.Component {
     const file = _.get(message, 'file');
     if (!file) return null;
     const filePath = _.get(message, 'file.path');
-    const s3configs = peerClient.storageConfig.configs;
+    const s3configs = peerClient.getStorageConfig().configs || {};
     const uri = `https://${s3configs.s3_default_bucket}.s3-${s3configs.s3_region}.amazonaws.com/${filePath}`;
     return (
       <div>
@@ -40,6 +40,7 @@ class ListMessages extends React.Component {
       </div>
     );
   }
+
 
   render() {
     const { messages, currentUser } = this.props;
@@ -51,9 +52,10 @@ class ListMessages extends React.Component {
               key={message.id}
               className={classnames({
                 item: true,
-                log: message.type === 'LOG',
-                incoming: message.sender && currentUser.user_id !== message.sender.user_id && message.type !== 'LOG',
-                outgoing: message.sender && currentUser.user_id === message.sender.user_id && message.type !== 'LOG',
+                log: ['LOG', 'RECORD'].includes(message.type),
+                record: message.type === 'RECORD',
+                incoming: message.sender && currentUser.user_id !== message.sender.user_id && !['LOG', 'RECORD'].includes(message.type),
+                outgoing: message.sender && currentUser.user_id === message.sender.user_id && !['LOG', 'RECORD'].includes(message.type),
               })}
             >
               <div className="timeline">{moment(message.sentAt).fromNow()}</div>

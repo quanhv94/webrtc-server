@@ -28,7 +28,7 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
     };
     return { user, room, storageConfig, chatRoomConfig, toolConfig };
   } catch {
-    return { error: 'Can not connect to server' };
+    return { error: 'Can\'t connect to server' };
   }
 };
 

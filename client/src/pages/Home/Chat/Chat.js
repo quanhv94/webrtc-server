@@ -34,7 +34,7 @@ class ChatBox extends React.Component {
   }
 
   sendMessage = (text) => {
-    peerClient.sendMessage(text);
+    peerClient.sendMessage({ content: text });
   }
 
   sendFile = async (file) => {
@@ -43,7 +43,7 @@ class ChatBox extends React.Component {
       return;
     }
     toast.success('File is being uploaded');
-    const uploadedPath = await peerClient.uploadFile(file);
+    const uploadedPath = await peerClient.uploadFile(file, 'messages');
     peerClient.sendMessage('', {
       name: file.name,
       path: uploadedPath,

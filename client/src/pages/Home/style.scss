@@ -97,7 +97,7 @@
         button {
           color: #fff;
           box-shadow: none;
-          &:not(.active) {
+          &.active {
             color: red;
           }
         }

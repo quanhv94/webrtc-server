@@ -1,40 +1,19 @@
+/* eslint-disable lines-between-class-members */
 import Peer from 'simple-peer';
 import EventEmitter from 'eventemitter3';
 import firebase from 'firebase/app';
+import qs from 'qs';
 import 'firebase/database';
 import axios from 'axios';
+import { RecordRTCPromisesHandler, invokeSaveAsDialog } from 'recordrtc';
 import _ from 'lodash';
+import uuid from 'uuid/v4';
 import moment from 'moment';
 import socket from '../socket/index';
 import LocalStorage from './LocalStorage';
+import Constants from '../config/constants';
 
-const iceServers = [
-  {
-    url: 'turn:numb.viagenie.ca',
-    credential: 'muazkh',
-    username: 'webrtc@live.com',
-  },
-  {
-    url: 'turn:192.158.29.39:3478?transport=udp',
-    credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-    username: '28224511:1379330808',
-  },
-  {
-    url: 'turn:192.158.29.39:3478?transport=tcp',
-    credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-    username: '28224511:1379330808',
-  },
-  {
-    url: 'turn:turn.bistri.com:80',
-    credential: 'homeo',
-    username: 'homeo',
-  },
-  {
-    url: 'turn:turn.anyfirewall.com:443?transport=tcp',
-    credential: 'webrtc',
-    username: 'webrtc',
-  },
-];
+const SCREEN_RECORD_TIME_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 /**
  * @returns { Promise<MediaStream>}
@@ -55,37 +34,44 @@ const getUserMedia = () => new Promise((resolve, reject) => {
  * @returns { Promise<MediaStream>}
  */
 const getDisplayMedia = () => {
-  const displayStream = navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  const displayStream = navigator.mediaDevices.getDisplayMedia({ video: true });
   return displayStream;
 };
 
 class PeerClient extends EventEmitter {
   constructor({ domain, token, roomCode, role }) {
     super();
-    if (!domain || !token || !roomCode) return;
-    this.roomCode = roomCode;
-    this.cameraOn = true;
-    this.microphoneOn = true;
+    if (!domain || !token || !roomCode || !role) return;
+    this.data = {
+      roomCode,
+      cameraOn: true,
+      microphoneOn: true,
+      screenRecordFileQueue: [],
+    };
     socket.addEventListener('rtc-signal', (data) => {
-      if (data.senderId !== this.user.user_id) {
-        this.peer.signal(data.signal);
+      if (data.senderId !== this.getUser().user_id) {
+        this.getPeer().signal(data.signal);
       }
     });
     socket.emit('join', { domain, token, roomCode, role });
-    socket.once('join-success', ({ user, room, storageConfig, chatRoomConfig, toolConfig, currentTime }) => {
+    socket.once('join-success', async ({ user, room, storageConfig, chatRoomConfig, toolConfig, currentTime }) => {
       this.emit('join-success', { user, room, storageConfig, chatRoomConfig, toolConfig, currentTime });
-      this.user = user;
-      this.room = room;
-      this.storageConfig = storageConfig;
-      this.chatRoomConfig = chatRoomConfig;
-      this.toolConfig = toolConfig;
-      this.getCameraStream();
-      this.initFilebaseChat();
-      this.initFilebaseNote();
+      this.setUser(user);
+      this.setRoom(room);
+      this.setStorageConfig(storageConfig);
+      this.setChatRoomConfig(chatRoomConfig);
+      this.setToolConfig(toolConfig);
+      this.requestCameraStream();
+      this.initFirebaseChat();
+      this.initFirebaseNote();
+      this.sendMessage({
+        content: `${this.getUser().full_name} joined`,
+        type: 'LOG',
+      });
     });
     socket.on('partner-leave', () => {
-      this.remoteCameraStream = null;
-      this.remoteScreenStream = null;
+      this.setRemoteCameraStream(null);
+      this.setRemoteScreenStream(null);
       this.destroyOldPeer();
       this.emit('partner-leave');
       this.playSoundEffect('leave');
@@ -95,7 +81,7 @@ class PeerClient extends EventEmitter {
       this.playSoundEffect('join');
     });
     socket.on('make-peer', ({ callerId }) => {
-      this.makePeer({ initiator: callerId === this.user.user_id });
+      this.makePeer({ initiator: callerId === this.getUser().user_id });
     });
     socket.on('join-error', (error) => {
       this.emit('join-error', error);
@@ -103,33 +89,115 @@ class PeerClient extends EventEmitter {
     socket.on('toast', (message) => {
       this.emit('toast', message);
     });
-    // socket.on('chat-message', (messages) => {
-    //   this.emit('chat-message', messages);
-    // });
     socket.on('disconnect', () => {
       this.emit('join-error', 'Disconnected');
     });
+    this.log(this);
   }
 
-  uploadFile = (file, prefix = 'upload') => new Promise((resolve, reject) => {
-    const key = `${prefix}/${Date.now()}_${file.name.replace(/[^A-z0-9.]/g, '_')}`;
-    socket.emit('request-s3-presigned-url', { key });
-    socket.once(`success-s3-presigned-url_${key}`, ({ presignedUrl, path }) => {
-      axios.put(presignedUrl, file)
-        .then(() => resolve(path))
-        .catch(reject);
-    });
-    socket.once(`error-s3-presigned-url_${key}`, reject);
-  })
+  setUser = (user) => { this.data.user = user; };
+  getUser = () => this.data.user;
 
-  initFilebaseChat = () => {
-    this.firebaseChat = firebase.initializeApp(this.chatRoomConfig.firebase, 'chat');
+  setRoomCode = (roomCode) => { this.data.roomCode = roomCode; };
+  getRoomCode = () => this.data.roomCode;
+
+  setRoom = (room) => { this.data.room = room; }
+  getRoom = () => this.data.room;
+
+  setPeer = (peer) => { this.data.peer = peer; }
+  /**
+   * @returns {Peer.Instance}
+   */
+  getPeer = () => this.data.peer;
+
+  setStorageConfig = (storageConfig) => { this.data.storageConfig = storageConfig; }
+  getStorageConfig = () => this.data.storageConfig;
+
+  setChatRoomConfig = (chatRoomConfig) => { this.data.chatRoomConfig = chatRoomConfig; }
+  getChatRoomConfig = () => this.data.chatRoomConfig;
+
+  setToolConfig = (toolConfig) => { this.data.toolConfig = toolConfig; }
+  getToolConfig = () => this.data.toolConfig;
+
+  setFirebaseChatDatabase = (firebaseChatDatabase) => {
+    this.data.firebaseChatDatabase = firebaseChatDatabase;
+  }
+  /** @returns {firebase.database.Database} */
+  getFirebaseChatDatabase = () => this.data.firebaseChatDatabase;
+
+  setFirebaseNoteDatabase = (firebaseNoteDatabase) => {
+    this.data.firebaseNoteDatabase = firebaseNoteDatabase;
+  }
+  /** @returns {firebase.database.Database} */
+  getFirebaseNoteDatabase = () => this.data.firebaseNoteDatabase;
+
+  // local
+  setLocalCameraStream = (localCameraStream) => { this.data.localCameraStream = localCameraStream; }
+  /** @returns {MediaStream} */
+  getLocalCameraStream = () => this.data.localCameraStream;
+
+  setLocalScreenStream = (localScreenStream) => { this.data.localScreenStream = localScreenStream; }
+  /** @returns {MediaStream} */
+  getLocalScreenStream = () => this.data.localScreenStream;
+
+  setRecordScreenStream = (recordScreenStream) => {
+    this.data.recordScreenStream = recordScreenStream;
+  }
+  /** @returns {MediaStream} */
+  getRecordScreenStream = () => this.data.recordScreenStream;
+
+  // remote
+  setRemoteCameraStream = (remoteCameraStream) => {
+    this.data.remoteCameraStream = remoteCameraStream;
+  }
+  /** @returns {MediaStream} */
+  getRemoteCameraStream = () => this.data.remoteCameraStream;
+
+  setRemoteScreenStream = (remoteScreenStream) => {
+    this.data.remoteScreenStream = remoteScreenStream;
+  }
+  /** @returns {MediaStream} */
+  getRemoteScreenStream = () => this.data.remoteScreenStream;
+
+  setRecordScreenStream = (recordScreenStream) => {
+    this.data.recordScreenStream = recordScreenStream;
+  }
+  /** @returns {MediaStream} */
+  getRecordScreenStream = () => this.data.recordScreenStream;
+
+  setCameraStatus = (enabled) => { this.data.cameraOn = enabled; }
+  isCameraOn = () => this.data.cameraOn;
+
+  setMicrophoneStatus = (enabled) => { this.data.microphoneOn = enabled; }
+  isMicrophoneOn = () => this.data.isMicrophoneOn;
+
+  setScreenRecorder = (recorder) => { this.data.screenRecorder = recorder; }
+  getScreenRecorder = () => this.data.screenRecorder;
+
+  getSreenRecordFileQueue = () => this.data.screenRecordFileQueue;
+  addFileToSreenRecordFileQueue = (file) => this.data.screenRecordFileQueue.push(file);
+  removeFileFromScreenRecordFileQueue = (fileId) => {
+    const queue = this.getSreenRecordFileQueue();
+    this.data.screenRecordFileQueue = queue.filter((x) => x.id !== fileId);
+  }
+  isScreenRecordFileQueueEmpty = () => _.isEmpty(this.data.screenRecordFileQueue);
+
+  isOutOfTime = () => {
+    const room = this.getRoom();
+    const endingTime = moment(room.plan_start_datetime).add(room.plan_duration, 'minute');
+    return moment().diff(moment(endingTime), 'second') > 0;
+  }
+
+  initFirebaseChat = () => {
+    const chatRoomConfig = this.getChatRoomConfig();
+    const database = firebase.initializeApp(chatRoomConfig.firebase, 'chat').database();
+    this.setFirebaseChatDatabase(database);
     // const userInboxRef = firebase.database().ref(this.chatRoomConfig.sender.userInboxRef);
     // userInboxRef.on('value', (snapshot) => {
     //   this.emit('chat-total-unread', _.get(snapshot.val(), 'totalUnread', 0));
     // });
 
-    const roomMessageRef = this.firebaseChat.database().ref(this.chatRoomConfig.roomMessageRef);
+    const roomMessageRef = database.ref(chatRoomConfig.roomMessageRef);
 
     // get last 500 messages
     roomMessageRef.limitToLast(500).once('value', (snapshot) => {
@@ -155,13 +223,52 @@ class PeerClient extends EventEmitter {
     });
   }
 
-  initFilebaseNote = async () => {
-    const { REALTIME_NOTE } = this.toolConfig;
-    this.firebaseNote = firebase.initializeApp(REALTIME_NOTE.firebase, 'note');
+  sendMessage = ({ content = '', type = 'TEXT', file = null }) => {
+    if (type === 'LOG' && process.env.NODE_ENV === 'development') {
+      console.log('LOG message', content);
+      return;
+    }
+    const chatRoomConfig = this.getChatRoomConfig();
+    const database = this.getFirebaseChatDatabase();
+    const roomMessageRef = database.ref(chatRoomConfig.roomMessageRef);
+    roomMessageRef.push({
+      sender: chatRoomConfig.sender,
+      type,
+      content,
+      file,
+      sentAt: moment().format(),
+    });
+
+    // Increase totalUnread of others members;
+    // chatRoomConfig.roomMembers.forEach((member) => {
+    //   if (member.user_id === this.getUser().user_id) return;
+    //   const ref = database.ref(member.userInboxRef);
+    //   ref.child('/totalUnread').once('value', (snapshot) => {
+    //     const totalUnread = snapshot.val() || 0;
+    //     ref.update({
+    //       totalUnread: totalUnread + 1,
+    //       updatedAt: moment().format(),
+    //     });
+    //   });
+    // });
+  }
+
+  resetTotalUnread = () => {
+    // const database = this.getFirebaseChatDatabase();
+    // database.ref(this.chatRoomConfig.sender.userInboxRef).update({
+    //   updatedAt: moment().format(),
+    //   totalUnread: 0,
+    // });
+  }
+
+  initFirebaseNote = async () => {
+    const { REALTIME_NOTE } = this.getToolConfig();
+    const database = firebase.initializeApp(REALTIME_NOTE.firebase, 'note').database();
+    this.setFirebaseNoteDatabase(database);
     const { noteRefs } = REALTIME_NOTE;
     this.emit('set-notes', noteRefs);
     noteRefs.forEach((noteRef) => {
-      const ref = this.firebaseNote.database().ref(noteRef.noteRef);
+      const ref = database.ref(noteRef.noteRef);
       ref.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && data.content) {
@@ -172,37 +279,36 @@ class PeerClient extends EventEmitter {
   }
 
   updateNoteContent = (content) => {
-    const { REALTIME_NOTE } = this.toolConfig;
+    const { REALTIME_NOTE } = this.getToolConfig();
     const { noteRefs } = REALTIME_NOTE;
-    const noteRef = _.find(noteRefs, (x) => x.userId === this.user.user_id);
+    const noteRef = _.find(noteRefs, (x) => x.userId === this.getUser().user_id);
     if (noteRef) {
-      const ref = this.firebaseNote.database().ref(noteRef.noteRef);
+      const ref = this.getFirebaseNoteDatabase().ref(noteRef.noteRef);
       ref.update({ content });
     }
   }
 
   playSoundEffect = (name) => {
-    console.log(`Play sound: ${name}`);
+    this.log(`Play sound: ${name}`);
     const audio = new Audio();
     audio.src = `/audio/${name}.mp3`;
     audio.play();
   }
 
-  getCameraStream = async () => {
+  requestCameraStream = async () => {
     try {
-      if (!this.localCameraStream) {
-        this.localCameraStream = await getUserMedia();
-        this.emit('ready');
-        this.emit('local-camera-stream', this.localCameraStream);
-        const userConfig = LocalStorage.loadUserConfig(this.user.user_id);
-        if (userConfig) {
-          this.localCameraStream.getVideoTracks()[0].enabled = userConfig.cameraOn;
-          this.cameraOn = userConfig.cameraOn;
-          this.localCameraStream.getAudioTracks()[0].enabled = userConfig.microphoneOn;
-          this.microphoneOn = userConfig.microphoneOn;
-        }
+      const localCameraStream = await getUserMedia();
+      this.setLocalCameraStream(localCameraStream);
+      this.emit('ready');
+      this.emit('local-camera-stream', localCameraStream);
+      const userConfig = LocalStorage.loadUserConfig(this.getUser().user_id);
+      if (userConfig) {
+        localCameraStream.getVideoTracks()[0].enabled = userConfig.cameraOn;
+        this.setCameraStatus(userConfig.cameraOn);
+        localCameraStream.getAudioTracks()[0].enabled = userConfig.microphoneOn;
+        this.setMicrophoneStatus(userConfig.microphoneOn);
       }
-      return this.localCameraStream;
+      return localCameraStream;
     } catch (error) {
       this.emit('toast', { type: 'error', content: 'Can not access camera' });
       return null;
@@ -211,32 +317,32 @@ class PeerClient extends EventEmitter {
 
   makePeer = ({ initiator }) => {
     this.destroyOldPeer();
-    this.peer = new Peer({
+    const peer = new Peer({
       initiator,
       config: {
-        iceServers,
+        iceServers: Constants.iceServers,
       },
     });
-    this.peer.on('signal', (signal) => {
+    peer.on('signal', (signal) => {
       socket.emit('rtc-signal', {
         roomCode: this.roomCode,
-        senderId: this.user.user_id,
+        senderId: this.getUser().user_id,
         signal,
       });
     });
 
-    this.peer.on('connect', async () => {
-      if (this.localCameraStream) {
-        this.peer.addStream(this.localCameraStream);
-        if (this.localScreenStream) {
-          this.peer.addStream(this.localScreenStream);
-        }
+    peer.on('connect', async () => {
+      if (this.getLocalCameraStream()) {
+        peer.addStream(this.getLocalCameraStream());
+      }
+      if (this.getLocalScreenStream()) {
+        peer.addStream(this.getLocalScreenStream());
       }
       this.send('greeting from your partner');
       this.sendConfig();
     });
 
-    this.peer.on('data', (data) => {
+    peer.on('data', (data) => {
       const str = data.toString();
       if (str === 'remote-screen-stream-ended') {
         this.emit('remote-screen-stream-ended');
@@ -251,150 +357,204 @@ class PeerClient extends EventEmitter {
       } else {
         this.emit('data', str);
       }
-      console.log('--on data--', str);
+      this.log('--on data--', str);
     });
 
-    this.peer.on('stream', (stream) => {
-      if (!this.remoteCameraStream) {
-        this.remoteCameraStream = stream;
+    peer.on('stream', (stream) => {
+      if (!this.getRemoteCameraStream()) {
+        this.setRemoteCameraStream(stream);
         this.emit('remote-camera-stream', stream);
+        if (this.getRecordScreenStream()) {
+          this.getRecordScreenStream().addTrack(stream.getAudioTracks()[0]);
+        }
       } else {
-        this.remoteScreenStream = stream;
+        this.setRemoteScreenStream(stream);
         this.emit('remote-screen-stream', stream);
       }
     });
+    this.setPeer(peer);
   }
 
   send = (data) => {
-    if (this.peer) {
-      this.peer.send(data);
+    if (this.getPeer()) {
+      this.getPeer().send(data);
     }
   }
 
   enableAudio = (enabled) => {
-    this.microphoneOn = enabled;
-    const audioTrack = this.localCameraStream.getAudioTracks()[0];
+    this.setMicrophoneStatus(enabled);
+    const localCameraStream = this.getLocalCameraStream();
+    const audioTrack = localCameraStream.getAudioTracks()[0];
     if (audioTrack) {
       this.sendConfig();
       audioTrack.enabled = enabled;
     }
-    this.sendMessage(`${this.user.full_name} turn ${enabled ? 'on' : 'off'} microphone`, 'LOG');
+    this.sendMessage({
+      content: `${this.getUser().full_name} turn ${enabled ? 'on' : 'off'} microphone`,
+      type: 'LOG',
+    });
   }
 
   enableVideo = (enabled) => {
-    this.cameraOn = enabled;
-    const videoTrack = this.localCameraStream.getVideoTracks()[0];
+    this.setCameraStatus(enabled);
+    const localCameraStream = this.getLocalCameraStream();
+    const videoTrack = localCameraStream.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.enabled = enabled;
       this.sendConfig();
     }
-    this.sendMessage(`${this.user.full_name} turn ${enabled ? 'on' : 'off'} camera`, 'LOG');
+    this.sendMessage({
+      content: `${this.getUser().full_name} turn ${enabled ? 'on' : 'off'} camera`,
+      type: 'LOG',
+    });
   }
 
   requestShareScreen = async () => {
     try {
       const localScreenStream = await getDisplayMedia();
-      this.localScreenStream = localScreenStream;
+      this.setLocalScreenStream(localScreenStream);
       localScreenStream.getTracks()[0].addEventListener('ended', this.removeShareScreen);
       this.emit('local-screen-stream', localScreenStream);
-      if (this.peer) {
-        this.peer.addStream(localScreenStream);
+      if (this.getPeer()) {
+        this.getPeer().addStream(localScreenStream);
       }
-      this.sendMessage(`${this.user.full_name} start share screen`, 'LOG');
+      this.sendMessage({
+        content: `${this.getUser().full_name} start share screen`,
+        type: 'LOG',
+      });
     } catch (error) {
       this.emit('toast', { type: 'error', content: 'Can not access display' });
     }
   }
 
   removeShareScreen = () => {
-    this.localScreenStream.getTracks().forEach((x) => x.stop());
+    this.getLocalScreenStream().getTracks().forEach((x) => x.stop());
     this.emit('local-screen-stream-ended');
     this.send('remote-screen-stream-ended');
-    this.localScreenStream = null;
-    this.sendMessage(`${this.user.full_name} stop share screen`, 'LOG');
+    this.setLocalScreenStream(null);
+    this.sendMessage({
+      content: `${this.getUser().full_name} stop share screen`,
+      type: 'LOG',
+    });
   }
 
-  requestRecordScreenStream = async () => {
+  requestRecordScreen = async () => {
     try {
       const recordScreenStream = await getDisplayMedia();
-      recordScreenStream.addTrack(this.localCameraStream.getAudioTracks()[0]);
-      this.recordScreenStream = recordScreenStream;
-      return recordScreenStream;
+      const localCameraStream = this.getLocalCameraStream();
+      recordScreenStream.addTrack(localCameraStream.getAudioTracks()[0]);
+      const remoteCameraStream = this.getRemoteCameraStream();
+      if (remoteCameraStream) {
+        recordScreenStream.addTrack(remoteCameraStream.getAudioTracks()[0]);
+      }
+      recordScreenStream.getVideoTracks()[0].addEventListener('ended', this.stopRecordScreen);
+      this.setRecordScreenStream(recordScreenStream);
+      this.startRecordScreen();
+      this.log('start record screen');
+      this.emit('start-record-screen');
     } catch (error) {
-      console.log(error);
-      this.emit('message', { type: 'error', content: 'Can not access display' });
-      return null;
+      this.log(error);
+      this.emit('toast', { type: 'error', content: 'Please provide recording screen permission.' });
     }
   }
 
-  removeRecordScreenStream = () => {
-    if (this.recordScreenStream) {
-      this.recordScreenStream.getTracks().forEach((x) => x.stop());
-      this.recordScreenStream = null;
+  startRecordScreen = async () => {
+    const recordScreenStream = this.getRecordScreenStream();
+    if (!recordScreenStream) return;
+    const recorder = new RecordRTCPromisesHandler(recordScreenStream, { type: 'video', disableLogs: true });
+    await recorder.startRecording();
+    this.setScreenRecorder(recorder);
+    setTimeout(() => this.saveRecordScreen(), SCREEN_RECORD_TIME_LIMIT);
+  }
+
+  stopRecordScreen = async () => {
+    this.log('stop record screen');
+    const recorder = this.getScreenRecorder();
+    const recordScreenStream = this.getRecordScreenStream();
+    if (!recorder || !recordScreenStream) return;
+    recordScreenStream.getTracks().forEach((x) => x.stop());
+    this.saveRecordScreen();
+    this.setScreenRecorder(null);
+    this.setRecordScreenStream(null);
+    this.emit('stop-record-screen');
+  }
+
+  saveRecordScreen = async () => {
+    const recorder = this.getScreenRecorder();
+    if (!recorder) return;
+    await recorder.stopRecording();
+    const blob = await recorder.getBlob();
+    const file = new File([blob], 'video.webm');
+    const fileId = uuid();
+    file.id = fileId;
+    this.addFileToSreenRecordFileQueue(file);
+    this.log('record file queue', this.getSreenRecordFileQueue());
+    this.startRecordScreen();
+    try {
+      const path = await this.uploadFile(file, 'recorders');
+      this.log(`Saved screen record to server ${path}`);
+      this.sendMessage({
+        content: `Lesson recording (${moment().format('YYYY-MM-DD HH:mm:ss')})`,
+        file: {
+          name: file.name,
+          path,
+          size: file.size,
+        },
+        type: 'RECORD',
+      });
+    } catch {
+      invokeSaveAsDialog(blob, `${Date.now()}_video.webm`);
+      this.log('Saved screen record to local');
+    } finally {
+      this.removeFileFromScreenRecordFileQueue(fileId);
+      this.log('record file queue', this.getSreenRecordFileQueue());
     }
   }
 
   sendConfig = () => {
-    this.send(`remote-camera-${this.cameraOn ? 'on' : 'off'}`);
-    this.send(`remote-microphone-${this.microphoneOn ? 'on' : 'off'}`);
+    this.send(`remote-camera-${this.isCameraOn() ? 'on' : 'off'}`);
+    this.send(`remote-microphone-${this.isMicrophoneOn() ? 'on' : 'off'}`);
   }
 
-  sendMessage = (content, file = null, type = 'TEXT') => {
-    const roomMessageRef = this.firebaseChat.database().ref(this.chatRoomConfig.roomMessageRef);
-    roomMessageRef.push({
-      sender: this.chatRoomConfig.sender,
-      type,
-      content,
-      file,
-      sentAt: moment().format(),
+  uploadFile = (file, prefix = 'upload') => new Promise((resolve, reject) => {
+    const key = `${prefix}/${Date.now()}_${file.name.replace(/[^A-z0-9.]/g, '_')}`;
+    socket.emit('request-s3-presigned-url', { key });
+    socket.once(`success-s3-presigned-url_${key}`, ({ presignedUrl, path }) => {
+      axios.put(presignedUrl, file)
+        .then(() => resolve(path))
+        .catch(reject);
     });
-    // this.increaseChatTotalUnread();
-  }
-
-  // increaseChatTotalUnread = () => {
-  //   this.chatRoomConfig.roomMembers.forEach((member) => {
-  //     if (member.user_id === this.user.user_id) return;
-  //     const ref = firebase.database().ref(member.userInboxRef);
-  //     ref.child('/totalUnread').once('value', (snapshot) => {
-  //       const totalUnread = snapshot.val() || 0;
-  //       ref.update({
-  //         totalUnread: totalUnread + 1,
-  //         updatedAt: moment().format(),
-  //       });
-  //     });
-  //   });
-  // }
-
-  resetTotalUnread = () => {
-    // firebase.database().ref(this.chatRoomConfig.sender.userInboxRef).update({
-    //   updatedAt: moment().format(),
-    //   totalUnread: 0,
-    // });
-  }
-
-  destroy = () => {
-    this.destroyOldPeer();
-    socket.emit('leave');
-    socket.removeAllListeners();
-  }
+    socket.once(`error-s3-presigned-url_${key}`, reject);
+  })
 
   destroyOldPeer = () => {
-    if (this.peer) {
-      this.peer.destroy();
-      this.peer = null;
+    if (this.getPeer()) {
+      this.getPeer().destroy();
+      this.setPeer(null);
     }
   }
 
+  leave = () => {
+    this.destroyOldPeer();
+    this.sendMessage({
+      content: `${this.getUser().full_name} leaved`,
+      type: 'LOG',
+    });
+    socket.emit('leave');
+  }
+
   static isSupported = () => Peer.WEBRTC_SUPPORT;
+
+  log = (...params) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(...params);
+    }
+  }
 }
 
-const { pathname } = window.location;
-const params = pathname.split('/');
-const peerClient = new PeerClient({
-  domain: window.atob(params[1]),
-  token: params[2],
-  roomCode: params[3],
-  role: params[4],
-});
+const params = qs.parse(window.location.search, { ignoreQueryPrefix: true });
+const { domain, token, lessonId: roomCode, role } = params;
+console.log({ domain, token, roomCode, role });
+const peerClient = new PeerClient({ domain: atob(domain), token, roomCode, role });
 
 export default peerClient;

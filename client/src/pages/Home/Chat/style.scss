@@ -76,6 +76,10 @@
           .avatar {
             display: none !important;
           }
+          a {
+            color: #007bff !important;
+            text-decoration: underline;
+          }
         }
         &.incoming + .incoming,
         &.outgoing + .outgoing,
@@ -114,6 +118,10 @@
           }
           .timeline {
             text-align: center;
+          }
+          &.record .bubble {
+            border-color: #f5c6cb;
+            background-color: #f8d7da;
           }
         }
         .avatar {

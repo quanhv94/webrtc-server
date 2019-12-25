@@ -26,6 +26,7 @@ class Sidebar extends React.Component {
       const sidebar = document.querySelector('.sidebar');
       sidebar.style.width = `${sidebarWidth}px`;
     }
+    this.onResize();
   }
 
   toggle = (tab) => {

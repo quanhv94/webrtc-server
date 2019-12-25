@@ -20,6 +20,7 @@ import './style.scss';
 import LocalStorage from '../../util/LocalStorage';
 import Clock from '../../components/Clock';
 import CountDownTimer from '../../components/CountDownTimer';
+import Toolbar from './Toolbar/Toolbar';
 
 class Home extends React.Component {
   static propTypes = {
@@ -75,6 +76,9 @@ class Home extends React.Component {
       }
       setRoom(room);
       setCurrentUser(user);
+      window.onbeforeunload = (event) => {
+        event.returnValue = 'Are you sure to leave?';
+      };
     });
     peerClient.on('ready', () => {
       this.setState({ ready: true });
@@ -154,18 +158,10 @@ class Home extends React.Component {
     peerClient.enableVideo(!userConfig.cameraOn);
   }
 
-  toggleShareScreen = () => {
-    const { userConfig } = this.props;
-    if (userConfig.shareScreenOn) {
-      peerClient.removeShareScreen();
-    } else {
-      peerClient.requestShareScreen();
-    }
-  }
-
   onTimeout = () => {
-    peerClient.destroy();
     toast.error('Time is over');
+    document.querySelector('.screen-wrapper').classList.add('disabled');
+    peerClient.leave();
   }
 
   renderHeader = () => {
@@ -209,15 +205,7 @@ class Home extends React.Component {
           <h4>{`${_.get(room, 'instance.instance_name')}-${room.name}`}</h4>
           <div>{`Hi, ${currentUser && currentUser.full_name}`}</div>
         </div>
-        <div className="header-right">
-          <Button
-            color="transparent"
-            className={classnames({ active: userConfig.shareScreenOn })}
-            onClick={this.toggleShareScreen}
-          >
-            <i className="icon-screen-desktop" />
-          </Button>
-        </div>
+        <Toolbar />
       </div>
     );
   }
