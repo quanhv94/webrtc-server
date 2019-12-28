@@ -44,11 +44,15 @@ class ChatBox extends React.Component {
     }
     toast.success('File is being uploaded');
     const uploadedPath = await peerClient.uploadFile(file, 'messages');
-    peerClient.sendMessage('', {
-      name: file.name,
-      path: uploadedPath,
-      size: file.size,
-    }, imageExtensions.test(file.name) ? 'IMAGE' : 'FILE');
+    peerClient.sendMessage({
+      content: '',
+      file: {
+        name: file.name,
+        path: uploadedPath,
+        size: file.size,
+      },
+      type: imageExtensions.test(file.name) ? 'IMAGE' : 'FILE',
+    });
   }
 
   render() {

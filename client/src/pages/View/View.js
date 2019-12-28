@@ -9,7 +9,7 @@ import { Button } from 'reactstrap';
 import moment from 'moment';
 import { toast } from 'react-toastify';
 import peerClient from '../../util/WebRTCClient';
-import Sidebar from './Sidebar/Sidebar';
+import Sidebar from '../Home/Sidebar/Sidebar';
 import errorActions from '../../state/error/actions';
 import roomActions from '../../state/room/actions';
 import userActions from '../../state/user/actions';
@@ -20,10 +20,10 @@ import './style.scss';
 import LocalStorage from '../../util/LocalStorage';
 import Clock from '../../components/Clock';
 import CountDownTimer from '../../components/CountDownTimer';
-import Toolbar from './Toolbar/Toolbar';
+import Toolbar from '../Home/Toolbar/Toolbar';
 import StreamVideo from '../../components/StreamVideo';
 
-class Home extends React.Component {
+class View extends React.Component {
   static propTypes = {
     setError: PropTypes.func.isRequired,
     error: PropTypes.string.isRequired,
@@ -159,48 +159,18 @@ class Home extends React.Component {
 
   onTimeout = () => {
     toast.error('Time is out!');
-    document.querySelector('.screen-wrapper').classList.add('disabled');
-    peerClient.leave();
   }
 
   renderHeader = () => {
     const {
       localCameraStream,
-      localScreenStream,
       remoteScreenStream,
       remoteCameraStream,
     } = this.state;
     const { userConfig, room, currentUser } = this.props;
     return (
       <div className="header">
-        <div className="header-left">
-          <div className="local-camera">
-            <StreamVideo stream={localCameraStream} muted />
-            <div className="d-none">
-              <StreamVideo stream={localScreenStream} muted />
-            </div>
-            <div className="controls">
-              <Button
-                color="transparent"
-                className={classnames({ active: userConfig.microphoneOn })}
-                onClick={this.toggleMicrophone}
-              >
-                <i className="icon-microphone" />
-              </Button>
-              <Button
-                color="transparent"
-                className={classnames({ active: userConfig.cameraOn })}
-                onClick={this.toggleCamera}
-              >
-                <i className="icon-camrecorder" />
-              </Button>
-            </div>
-          </div>
-          <div className="remote-camera">
-            <StreamVideo stream={remoteScreenStream ? remoteCameraStream : null} />
-          </div>
-        </div>
-        <div className="header-center d-none d-md-block">
+        <div className="header-center">
           <h4>{`${_.get(room, 'instance.instance_name')}-${room.name}`}</h4>
           <div>{`Hi, ${currentUser && currentUser.full_name}`}</div>
         </div>
@@ -293,4 +263,4 @@ const mapDispatchToProps = (dispatch) => bindActionCreators({
   setPartnerShareScreen: partnerConfigActions.setShareScreen,
 }, dispatch);
 
-export default connect(mapStateToProps, mapDispatchToProps)(Home);
+export default connect(mapStateToProps, mapDispatchToProps)(View);

@@ -42,11 +42,8 @@ class CountDownTimer extends React.Component {
 
   render() {
     const { duration } = this.state;
-    const hours = Math.floor(duration / 3600).toString().padStart('2', 0);
-    const minutes = Math.floor((duration / 60) % 60).toString().padStart('2', 0);
-    const seconds = Math.floor(duration % 60).toString().padStart('2', 0);
     return (
-      <Badge color="danger">{`${hours}:${minutes}:${seconds}`}</Badge>
+      <Badge color="danger">{moment().startOf('day').seconds(duration).format('HH:mm:ss')}</Badge>
     );
   }
 }

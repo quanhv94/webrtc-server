@@ -2,12 +2,14 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
 import qs from 'qs';
+import moment from 'moment';
 import { Button } from 'reactstrap';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { confirmAlert } from 'react-confirm-alert';
 import { toast } from 'react-toastify';
 import peerClient from '../../../util/WebRTCClient';
+import Ability from '../../../components/Ability';
 
 class ToolBar extends React.Component {
   static propTypes = {
@@ -69,7 +71,10 @@ class ToolBar extends React.Component {
     const moveToHome = () => {
       window.onbeforeunload = null;
       peerClient.leave();
-      window.location.href = window.atob(params.domain);
+      toast.success('Redirecting to home page');
+      setTimeout(() => {
+        window.location.href = window.atob(params.domain);
+      }, 2000);
     };
     if (!peerClient.isOutOfTime()) {
       confirmAlert({
@@ -87,26 +92,34 @@ class ToolBar extends React.Component {
   }
 
   render() {
-    const { isRecordingScreen } = this.state;
+    const { isRecordingScreen, screenRecordingTime } = this.state;
     const { userConfig, currentUser } = this.props;
+    if (!currentUser) return null;
     return (
       <div className="header-right">
-        <Button
-          color="transparent"
-          className={classnames({ active: userConfig.shareScreenOn })}
-          onClick={this.toggleShareScreen}
-        >
-          <i className="icon-screen-desktop" />
-        </Button>
-        {currentUser && currentUser.role === 'TEACHER' && (
+        <Ability userRole={currentUser.role} accessibleRoles="TEACHER,STUDENT">
+          <Button
+            color="transparent"
+            className={classnames({ active: userConfig.shareScreenOn })}
+            onClick={this.toggleShareScreen}
+          >
+            <i className="icon-screen-desktop" />
+          </Button>
+        </Ability>
+        <Ability userRole={currentUser.role} accessibleRoles="TEACHER">
           <Button
             color="transparent"
             className={classnames({ active: isRecordingScreen })}
             onClick={this.toggleRecordScreen}
           >
             <i className="fa fa-dot-circle-o" />
+            {isRecordingScreen && (
+              <span className="small recording-time">
+                {moment().startOf('day').seconds(screenRecordingTime).format('HH:mm:ss')}
+              </span>
+            )}
           </Button>
-        )}
+        </Ability>
         <Button
           color="transparent"
           onClick={this.leave}

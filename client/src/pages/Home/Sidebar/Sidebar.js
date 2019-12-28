@@ -49,7 +49,7 @@ class Sidebar extends React.Component {
     const { activeTab, room, chat } = this.props;
     return (
       <Resizable
-        className="sidebar"
+        className="sidebar d-none d-md-flex"
         ref={(ref) => { this.sidebarRef = ref; }}
         defaultSize={{
           width: 350,
