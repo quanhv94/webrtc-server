@@ -9,6 +9,11 @@ class ListMessages extends React.Component {
   static propTypes = {
     currentUser: PropTypes.object.isRequired,
     messages: PropTypes.array.isRequired,
+    viewer: PropTypes.object,
+  }
+
+  static defaultProps = {
+    viewer: null,
   }
 
   constructor(props) {
@@ -43,7 +48,8 @@ class ListMessages extends React.Component {
 
 
   render() {
-    const { messages, currentUser } = this.props;
+    const { messages, currentUser, viewer } = this.props;
+    const userId = viewer ? viewer.userId : currentUser.user_id;
     return (
       <div className="content" ref={this.ref}>
         <div className="message-list">
@@ -54,8 +60,8 @@ class ListMessages extends React.Component {
                 item: true,
                 log: ['LOG', 'RECORD'].includes(message.type),
                 record: message.type === 'RECORD',
-                incoming: message.sender && currentUser.user_id !== message.sender.user_id && !['LOG', 'RECORD'].includes(message.type),
-                outgoing: message.sender && currentUser.user_id === message.sender.user_id && !['LOG', 'RECORD'].includes(message.type),
+                incoming: message.sender && userId !== message.sender.user_id && !['LOG', 'RECORD'].includes(message.type),
+                outgoing: message.sender && userId === message.sender.user_id && !['LOG', 'RECORD'].includes(message.type),
               })}
             >
               <div className="timeline">{moment(message.sentAt).fromNow()}</div>

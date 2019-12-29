@@ -13,11 +13,7 @@ import Sidebar from '../Home/Sidebar/Sidebar';
 import errorActions from '../../state/error/actions';
 import roomActions from '../../state/room/actions';
 import userActions from '../../state/user/actions';
-import partnerActions from '../../state/partner/actions';
-import userConfigActions from '../../state/userConfig/actions';
-import partnerConfigActions from '../../state/partnerConfig/actions';
 import './style.scss';
-import LocalStorage from '../../util/LocalStorage';
 import Clock from '../../components/Clock';
 import CountDownTimer from '../../components/CountDownTimer';
 import Toolbar from '../Home/Toolbar/Toolbar';
@@ -29,18 +25,8 @@ class View extends React.Component {
     error: PropTypes.string.isRequired,
     room: PropTypes.object.isRequired,
     currentUser: PropTypes.object,
-    hasPartner: PropTypes.bool.isRequired,
-    setPartner: PropTypes.func.isRequired,
-    userConfig: PropTypes.object.isRequired,
-    partnerConfig: PropTypes.object.isRequired,
     setCurrentUser: PropTypes.func.isRequired,
     setRoom: PropTypes.func.isRequired,
-    setCamera: PropTypes.func.isRequired,
-    setMicrophone: PropTypes.func.isRequired,
-    setShareScreen: PropTypes.func.isRequired,
-    setPartnerCamera: PropTypes.func.isRequired,
-    setPartnerMicrophone: PropTypes.func.isRequired,
-    setPartnerShareScreen: PropTypes.func.isRequired,
   }
 
   static defaultProps = {
@@ -53,10 +39,16 @@ class View extends React.Component {
       ready: false,
       currentTime: null,
       endingTime: null,
-      localCameraStream: null,
-      localScreenStream: null,
-      remoteCameraStream: null,
-      remoteScreenStream: null,
+      teacher: {},
+      student: {},
+      teacherCameraStream: null,
+      teacherScreenStream: null,
+      studentCameraStream: null,
+      studentScreenStream: null,
+      teacherMicrophoneOn: false,
+      teacherCameraOn: false,
+      studentMicrophoneOn: false,
+      studentCameraOn: false,
     };
   }
 
@@ -66,95 +58,87 @@ class View extends React.Component {
 
   listenPeerClient = () => {
     peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
-      const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
+      if (!['MANAGER', 'PARENT'].includes(user.role)) {
+        alert('Do not have permission');
+        window.location.href = '/';
+      }
+      const { setCurrentUser, setRoom } = this.props;
       this.setState({
         currentTime,
         endingTime: moment(roomDetail.plan_start_datetime).add(roomDetail.plan_duration, 'minute'),
       });
-      const userConfig = LocalStorage.loadUserConfig(user.user_id);
-      if (userConfig) {
-        setCamera(userConfig.cameraOn);
-        setMicrophone(userConfig.microphoneOn);
-      }
+
       setRoom(roomDetail);
       setCurrentUser(user);
       // window.onbeforeunload = (event) => {
       //   event.returnValue = 'Are you sure to leave?';
       // };
     });
+    peerClient.on('teacher-info', (teacher) => {
+      this.setState({ teacher });
+    });
+    peerClient.on('student-info', (student) => {
+      this.setState({ student });
+    });
     peerClient.on('ready', () => {
       this.setState({ ready: true });
     });
     peerClient.on('camera-stream', ({ stream, user }) => {
-      const { currentUser } = this.props;
-      if (currentUser.user_id === user.user_id) {
-        this.setState({ localCameraStream: stream });
+      const { teacher } = this.state;
+      if (teacher.userId === user.user_id) {
+        this.setState({ teacherCameraStream: stream });
       } else {
-        this.setState({ remoteCameraStream: stream });
+        this.setState({ studentCameraStream: stream });
       }
     });
     peerClient.on('screen-stream', ({ stream, user }) => {
-      const { currentUser, setShareScreen, setPartnerShareScreen } = this.props;
-      if (currentUser.user_id === user.user_id) {
-        setShareScreen(true);
-        this.setState({ localScreenStream: stream });
+      const { teacher } = this.state;
+      if (teacher.userId === user.user_id) {
+        this.setState({ teacherScreenStream: stream });
       } else {
-        this.setState({ remoteScreenStream: stream });
-        setPartnerShareScreen(true);
+        this.setState({ studentScreenStream: stream });
       }
     });
     peerClient.on('screen-stream-ended', ({ userId }) => {
-      const { currentUser, setShareScreen, setPartnerShareScreen } = this.props;
-      if (currentUser.user_id === userId) {
-        this.setState({ localScreenStream: null });
-        setShareScreen(false);
+      const { teacher } = this.state;
+      if (teacher.userId === userId) {
+        this.setState({ teacherScreenStream: null });
       } else {
-        this.setState({ remoteScreenStream: null });
-        setPartnerShareScreen(false);
+        this.setState({ studentScreenStream: null });
       }
     });
     peerClient.on('turn-camera', ({ userId, status }) => {
-      const { setPartnerCamera, setCamera, currentUser } = this.props;
-      if (currentUser.user_id === userId) {
-        setCamera(status);
+      const { teacher } = this.state;
+      if (teacher.userId === userId) {
+        this.setState({ teacherCameraOn: status });
       } else {
-        setPartnerCamera(status);
+        this.setState({ studentCameraOn: status });
       }
     });
     peerClient.on('turn-microphone', ({ userId, status }) => {
-      const { setPartnerMicrophone, setMicrophone, currentUser } = this.props;
-      if (currentUser.user_id === userId) {
-        setMicrophone(status);
+      const { teacher } = this.state;
+      if (teacher.userId === userId) {
+        this.setState({ teacherMicrophoneOn: status });
       } else {
-        setPartnerMicrophone(status);
+        this.setState({ studentMicrophoneOn: status });
+      }
+    });
+    peerClient.on('leave', ({ leaver }) => {
+      const { teacher, student } = this.state;
+      if (teacher.userId === leaver.user_id) {
+        this.setState({ teacherCameraStream: null, teacherScreenStream: null });
+      }
+      if (student.userId === leaver.user_id) {
+        this.setState({ studentCameraStream: null, studentScreenStream: null });
       }
     });
     peerClient.on('toast', (message) => {
       toast[message.type](message.content);
     });
-    peerClient.on('join-error', (error) => {
+    peerClient.on('error', (error) => {
       const { setError } = this.props;
       setError(error);
     });
-    peerClient.on('partner-left', () => {
-      const { setPartner } = this.props;
-      setPartner(null);
-      this.setState({ remoteCameraStream: null, remoteScreenStream: null });
-    });
-    peerClient.on('partner-joined', (partner) => {
-      const { setPartner } = this.props;
-      setPartner(partner);
-    });
-  }
-
-  toggleMicrophone = () => {
-    const { userConfig } = this.props;
-    peerClient.enableAudio(!userConfig.microphoneOn);
-  }
-
-  toggleCamera = () => {
-    const { userConfig } = this.props;
-    peerClient.enableVideo(!userConfig.cameraOn);
   }
 
   onTimeout = () => {
@@ -162,12 +146,7 @@ class View extends React.Component {
   }
 
   renderHeader = () => {
-    const {
-      localCameraStream,
-      remoteScreenStream,
-      remoteCameraStream,
-    } = this.state;
-    const { userConfig, room, currentUser } = this.props;
+    const { room, currentUser } = this.props;
     return (
       <div className="header">
         <div className="header-center">
@@ -184,47 +163,67 @@ class View extends React.Component {
       ready,
       currentTime,
       endingTime,
-      remoteCameraStream,
-      remoteScreenStream,
+      teacher,
+      teacherCameraStream,
+      teacherScreenStream,
+      teacherCameraOn,
+      teacherMicrophoneOn,
+      studentCameraStream,
+      studentScreenStream,
+      studentCameraOn,
+      studentMicrophoneOn,
     } = this.state;
-    const {
-      error,
-      hasPartner,
-      partnerConfig,
-    } = this.props;
+    const { error } = this.props;
     return (
       <div className={classnames('home-page')}>
         <div className={classnames('content-wrapper')}>
           {this.renderHeader()}
           <div className="screen-wrapper">
             <div className="main-video-container">
-              <StreamVideo stream={remoteScreenStream || remoteCameraStream} />
-              <div className={classnames('controls', { 'd-none': !hasPartner })}>
+              <StreamVideo stream={teacherScreenStream ? teacherCameraStream : null} className="small" />
+              <StreamVideo stream={teacherScreenStream || teacherCameraStream} />
+              <div className={classnames('controls', { 'd-none': !teacherCameraStream })}>
                 <Button
                   color="transparent"
-                  className={classnames({ active: partnerConfig.microphoneOn })}
+                  className={classnames({ active: teacherMicrophoneOn })}
                 >
                   <i className="icon-microphone" />
                 </Button>
                 <Button
                   color="transparent"
-                  className={classnames({ active: partnerConfig.cameraOn })}
+                  className={classnames({ active: teacherCameraOn })}
                 >
                   <i className="icon-camrecorder" />
                 </Button>
               </div>
-              {ready && (
-                <div>
-                  <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
-                    <Clock initialTime={currentTime} />
-                  </div>
-                  <div style={{ position: 'absolute', right: 10, bottom: 10 }}>
-                    <CountDownTimer endingTime={endingTime} onTimeout={this.onTimeout} />
-                  </div>
-                </div>
-              )}
             </div>
-            <Sidebar />
+            <div style={{ width: 2, backgroundColor: '#fff' }} />
+            <div className="main-video-container">
+              <StreamVideo stream={studentScreenStream ? studentCameraStream : null} className="small" />
+              <StreamVideo stream={studentScreenStream || studentCameraStream} />
+              <div className={classnames('controls', { 'd-none': !studentCameraStream })}>
+                <Button
+                  color="transparent"
+                  className={classnames({ active: studentMicrophoneOn })}
+                >
+                  <i className="icon-microphone" />
+                </Button>
+                <Button
+                  color="transparent"
+                  className={classnames({ active: studentCameraOn })}
+                >
+                  <i className="icon-camrecorder" />
+                </Button>
+              </div>
+            </div>
+            {ready && (
+              <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
+                <Clock initialTime={currentTime} />
+                {' '}
+                <CountDownTimer endingTime={endingTime} onTimeout={this.onTimeout} />
+              </div>
+            )}
+            <Sidebar viewer={teacher} />
           </div>
         </div>
         <div className={classnames('waitting-ready', { 'd-none': ready })}>
@@ -232,9 +231,6 @@ class View extends React.Component {
         </div>
         <div className={classnames('error', { 'd-none': !error })}>
           <h3>{error}</h3>
-        </div>
-        <div className={classnames('waitting-partner-message', { 'd-none': hasPartner })}>
-          <p>Please wait for your partner</p>
         </div>
       </div>
     );
@@ -245,22 +241,12 @@ const mapStateToProps = (state) => ({
   error: state.error.message,
   room: state.room,
   currentUser: state.user.profile,
-  hasPartner: !!state.partner.profile,
-  userConfig: state.userConfig,
-  partnerConfig: state.partnerConfig,
 });
 
 const mapDispatchToProps = (dispatch) => bindActionCreators({
   setError: errorActions.setError,
-  setPartner: partnerActions.setPartner,
   setRoom: roomActions.setRoom,
   setCurrentUser: userActions.setCurrentUser,
-  setCamera: userConfigActions.setCamera,
-  setMicrophone: userConfigActions.setMicrophone,
-  setShareScreen: userConfigActions.setShareScreen,
-  setPartnerCamera: partnerConfigActions.setCamera,
-  setPartnerMicrophone: partnerConfigActions.setMicrophone,
-  setPartnerShareScreen: partnerConfigActions.setShareScreen,
 }, dispatch);
 
 export default connect(mapStateToProps, mapDispatchToProps)(View);

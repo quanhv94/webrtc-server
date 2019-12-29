@@ -77,16 +77,20 @@ class PeerClient extends EventEmitter {
         content: `${this.getUser().full_name} joined`,
         type: 'LOG',
       });
-      socket.on('leave', ({ leaverSocketId }) => {
+      socket.on('leave', ({ leaverSocketId, leaver }) => {
         this.removePeerByReceiverSocketId(leaverSocketId);
+        if (leaverSocketId === socket.id) {
+          this.emit('error', 'You logged at another browser');
+          this.leave();
+        } else if (isTeacherOrStudent(leaver)) {
+          this.emit('partner-leave');
+          this.playSoundEffect('leave');
+        }
+        this.emit('leave', { leaver });
       });
       socket.on('partner-joined', (partner) => {
         this.emit('partner-joined', partner);
         this.playSoundEffect('join');
-      });
-      socket.on('partner-left', () => {
-        this.emit('partner-left');
-        this.playSoundEffect('leave');
       });
       socket.on('make-peer', ({ initiatorSocketId, users }) => {
         this.makePeers({ initiatorSocketId, users });
@@ -104,11 +108,12 @@ class PeerClient extends EventEmitter {
         this.emit('screen-stream-ended', { userId });
       });
     });
-    socket.on('join-error', (error) => {
-      this.emit('join-error', error);
+    socket.on('error', (error) => {
+      this.removeAllPeers();
+      this.emit('error', error);
     });
     socket.on('disconnect', () => {
-      this.emit('join-error', 'Disconnected');
+      this.emit('error', 'Disconnected');
     });
   }
 
@@ -402,7 +407,8 @@ class PeerClient extends EventEmitter {
     });
 
     peer.on('stream', (stream) => {
-      if (!this.getRemoteCameraStream()) {
+      if (!peer.hasRemoteCameraStream) {
+        peer.hasRemoteCameraStream = true;
         this.setRemoteCameraStream(stream);
         this.emit('camera-stream', { stream, user: peer.receiver });
         if (this.getRecordScreenStream()) {
@@ -597,6 +603,6 @@ class PeerClient extends EventEmitter {
 
 const params = qs.parse(window.location.search, { ignoreQueryPrefix: true });
 const { domain, token, lessonId: roomCode, role } = params;
-const peerClient = new PeerClient({ domain: atob(domain), token, roomCode, role });
+const peerClient = new PeerClient({ domain: atob(domain || ''), token, roomCode, role });
 
 export default peerClient;

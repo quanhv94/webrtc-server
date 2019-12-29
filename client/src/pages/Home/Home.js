@@ -78,9 +78,11 @@ class Home extends React.Component {
       }
       setRoom(roomDetail);
       setCurrentUser(user);
-      // window.onbeforeunload = (event) => {
-      //   event.returnValue = 'Are you sure to leave?';
-      // };
+      if (process.env.NODE_ENV !== 'development') {
+        window.onbeforeunload = (event) => {
+          event.returnValue = 'Are you sure to leave?';
+        };
+      }
     });
     peerClient.on('ready', () => {
       this.setState({ ready: true });
@@ -132,11 +134,11 @@ class Home extends React.Component {
     peerClient.on('toast', (message) => {
       toast[message.type](message.content);
     });
-    peerClient.on('join-error', (error) => {
+    peerClient.on('error', (error) => {
       const { setError } = this.props;
       setError(error);
     });
-    peerClient.on('partner-left', () => {
+    peerClient.on('partner-leave', () => {
       const { setPartner } = this.props;
       setPartner(null);
       this.setState({ remoteCameraStream: null, remoteScreenStream: null });
@@ -243,17 +245,14 @@ class Home extends React.Component {
                   <i className="icon-camrecorder" />
                 </Button>
               </div>
-              {ready && (
-                <div>
-                  <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
-                    <Clock initialTime={currentTime} />
-                  </div>
-                  <div style={{ position: 'absolute', right: 10, bottom: 10 }}>
-                    <CountDownTimer endingTime={endingTime} onTimeout={this.onTimeout} />
-                  </div>
-                </div>
-              )}
             </div>
+            {ready && (
+              <div style={{ position: 'absolute', left: 10, bottom: 10 }}>
+                <Clock initialTime={currentTime} />
+                {' '}
+                <CountDownTimer endingTime={endingTime} onTimeout={this.onTimeout} />
+              </div>
+            )}
             <Sidebar />
           </div>
         </div>

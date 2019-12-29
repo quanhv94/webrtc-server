@@ -76,10 +76,6 @@
           .avatar {
             display: none !important;
           }
-          a {
-            color: #007bff !important;
-            text-decoration: underline;
-          }
         }
         &.incoming + .incoming,
         &.outgoing + .outgoing,
@@ -115,6 +111,10 @@
             color: #666;
             margin: 0 !important;
             text-align: center;
+            a {
+              color: #007bff !important;
+              text-decoration: underline;
+            }
           }
           .timeline {
             text-align: center;

@@ -18,6 +18,11 @@ class Sidebar extends React.Component {
     activeTab: PropType.string.isRequired,
     room: PropType.object.isRequired,
     chat: PropType.object.isRequired,
+    viewer: PropType.object,
+  }
+
+  static defaultProps = {
+    viewer: null,
   }
 
   componentDidMount() {
@@ -46,7 +51,7 @@ class Sidebar extends React.Component {
   }
 
   render() {
-    const { activeTab, room, chat } = this.props;
+    const { activeTab, room, chat, viewer } = this.props;
     return (
       <Resizable
         className="sidebar d-none d-md-flex"
@@ -96,7 +101,7 @@ class Sidebar extends React.Component {
         </Nav>
         <TabContent activeTab={activeTab}>
           <TabPane tabId="Chat">
-            <ChatBox />
+            <ChatBox viewer={viewer} />
           </TabPane>
           <TabPane tabId="Description">
             <div className="p-3">{room.description}</div>

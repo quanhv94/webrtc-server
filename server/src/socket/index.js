@@ -1,12 +1,16 @@
 import socketIO from 'socket.io';
 import AWS from 'aws-sdk';
 import _ from 'lodash';
+import delay from 'delay';
 import moment from 'moment-timezone';
 import request from 'request-promise';
 
 const checkRoom = async ({ domain, roomCode, token, role }) => {
   try {
     let uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
+    if (role === 'MANAGER') {
+      uri = 'http://test.e-school.rabita.vn/api/v1/class-lecture/load-data?lectureId=113&role=TEACHER&token=e0c7d790a4b9604da333ff80d0cd687f';
+    }
     console.log(uri);
     const response = await request({
       uri,
@@ -19,6 +23,10 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
     }
     const { user, lecture, instance } = data.data;
     const { storageConfig, chatRoomConfig, toolConfig, teacher, student } = lecture;
+    if (role === 'MANAGER') {
+      user.user_id = 10000;
+      user.role = role;
+    }
     const roomDetail = {
       name: lecture.class.name,
       description: lecture.class.description,
@@ -31,6 +39,8 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
     return { error: 'Can\'t connect to server' };
   }
 };
+
+const isTeacherOrStudent = (user) => (user.role && ['TEACHER', 'STUDENT'].includes(user.role));
 
 const rooms = {};
 const createRoom = (roomCode) => {
@@ -69,6 +79,7 @@ const addUserToRoom = (roomCode, user) => {
 
 const removeUserFromRoom = (roomCode, user) => {
   const room = getRoom(roomCode);
+  if (!room) return;
   room.users = room.users.filter((x) => x.user_id !== user.user_id);
   if (user.role === 'TEACHER') {
     room.hasTeacher = false;
@@ -92,9 +103,9 @@ const setRoomStorageConfig = (roomCode, storageConfig) => {
 
 const isUserJoinedRoom = (roomCode, user) => {
   const room = getRoom(roomCode);
-  if (!room) return false;
-  const isJoined = (_.find(room.users, (x) => x.user_id === user.user_id));
-  return isJoined;
+  if (!room) return null;
+  const joinedUser = (_.find(room.users, (x) => x.user_id === user.user_id));
+  return joinedUser;
 };
 
 const setupSocket = (server) => {
@@ -114,44 +125,60 @@ const setupSocket = (server) => {
         teacher,
         student,
       } = roomData;
-      user.socketId = socket.id;
       if (error) {
-        socket.emit('join-error', error);
+        socket.emit('error', error);
         return;
       }
-      if (isUserJoinedRoom(roomCode, user)) {
-        socket.emit('join-error', 'You logged in at another browser');
-      } else {
-        socket.data.user = user;
-        socket.join(roomCode);
-        createRoom(roomCode);
-        addUserToRoom(roomCode, user);
-        setRoomDetail(roomCode, roomDetail);
-        setRoomStorageConfig(roomCode, storageConfig);
-        socket.emit('join-success', {
-          user,
-          roomDetail,
-          storageConfig,
-          chatRoomConfig,
-          toolConfig,
-          currentTime: moment().format(),
-          teacher,
-          student,
+      user.socketId = socket.id;
+
+      // close old connection of same user if exist
+      const joinedUser = isUserJoinedRoom(roomCode, user);
+      if (joinedUser) {
+        io.to(roomCode).emit('leave', {
+          leaverSocketId: joinedUser.socketId,
+          leaverId: joinedUser.user_id,
+          leaver: joinedUser,
         });
-        const room = getRoom(roomCode);
-        io.in(roomCode).emit('make-peer', {
-          initiatorSocketId: socket.id,
-          users: room.users,
-        });
-        if (room.hasStudent && room.hasTeacher) {
-          io.to(roomCode).emit('partner-joined', true);
+        removeUserFromRoom(roomCode, joinedUser);
+        // clear old socket data
+        const joinedSocket = io.sockets.connected[joinedUser.socketId];
+        if (joinedSocket) {
+          joinedSocket.data = {};
         }
+        await delay(1000);
+      }
+
+      socket.data.user = user;
+      socket.join(roomCode);
+      createRoom(roomCode);
+      addUserToRoom(roomCode, user);
+      setRoomDetail(roomCode, roomDetail);
+      setRoomStorageConfig(roomCode, storageConfig);
+      socket.emit('join-success', {
+        user,
+        roomDetail,
+        storageConfig,
+        chatRoomConfig,
+        toolConfig,
+        currentTime: moment().format(),
+        teacher,
+        student,
+      });
+      const room = getRoom(roomCode);
+      io.in(roomCode).emit('make-peer', {
+        initiatorSocketId: socket.id,
+        users: room.users,
+      });
+      if (room.hasStudent && room.hasTeacher && isTeacherOrStudent(user)) {
+        io.to(roomCode).emit('partner-joined', true);
       }
     });
 
     const leave = () => {
       try {
         const { roomCode, user } = socket.data;
+        socket.leave(roomCode);
+        socket.data = {};
         if (!roomCode || !user) return;
         io.to(roomCode).emit('leave', {
           leaverSocketId: socket.id,
@@ -159,11 +186,6 @@ const setupSocket = (server) => {
           leaver: user,
         });
         removeUserFromRoom(roomCode, user);
-        const room = getRoom(roomCode);
-        if (!room) return;
-        if (!room.hasStudent || !room.hasTeacher) {
-          io.to(roomCode).emit('partner-left');
-        }
       } catch (e) {
         console.log('error', e);
       }
@@ -207,7 +229,6 @@ const setupSocket = (server) => {
           Expires: 3600,
           ACL: 'public-read',
         });
-        console.log(accessKeyId, secretAccessKey, region, keyWithPrefix);
         socket.emit(`success-s3-presigned-url_${key}`, { presignedUrl, path: keyWithPrefix });
       } catch {
         socket.emit(`error-s3-presigned-url_${key}`);

@@ -17,10 +17,12 @@ class ChatBox extends React.Component {
     messages: PropTypes.array.isRequired,
     appendMessage: PropTypes.func.isRequired,
     setTotalUnread: PropTypes.func.isRequired,
+    viewer: PropTypes.object,
   }
 
   static defaultProps = {
     currentUser: null,
+    viewer: null,
   }
 
   componentDidMount() {
@@ -56,18 +58,21 @@ class ChatBox extends React.Component {
   }
 
   render() {
-    const { currentUser, messages } = this.props;
+    const { currentUser, messages, viewer } = this.props;
     if (!currentUser) return null;
     return (
       <div className="chatbox">
         <ListMessages
           messages={messages}
           currentUser={currentUser}
+          viewer={viewer}
         />
-        <Form
-          onSendMessage={this.sendMessage}
-          onSendFile={this.sendFile}
-        />
+        {!viewer && (
+          <Form
+            onSendMessage={this.sendMessage}
+            onSendFile={this.sendFile}
+          />
+        )}
       </div>
     );
   }

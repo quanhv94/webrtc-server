@@ -6,11 +6,13 @@ class StreamVideo extends React.Component {
   static propTypes = {
     muted: PropTypes.bool,
     stream: PropTypes.any,
+    className: PropTypes.string,
   }
 
   static defaultProps = {
     muted: false,
     stream: null,
+    className: '',
   }
 
   componentDidUpdate(prevProps) {
@@ -18,15 +20,20 @@ class StreamVideo extends React.Component {
     const oldStream = prevProps.stream;
     const newStream = nextProps.stream;
     if (oldStream !== newStream) {
-      console.log('new stream');
       this.videoRef.srcObject = newStream;
     }
   }
 
   render() {
-    const { muted } = this.props;
+    const { muted, className } = this.props;
     return (
-      <video ref={(ref) => { this.videoRef = ref; }} muted={muted} autoPlay playsInline />
+      <video
+        ref={(ref) => { this.videoRef = ref; }}
+        muted={muted}
+        autoPlay
+        playsInline
+        className={className}
+      />
     );
   }
 }
