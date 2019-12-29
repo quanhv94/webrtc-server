@@ -1,0 +1,38 @@
+{
+  "en": {
+    "chat-pleaseTypeMessage": "Please type message...",
+    "common-chat": "Chat",
+    "common-description": "Description",
+    "common-note": "Note",
+    "common-cancel": "Cancel",
+    "common-exit": "Exit",
+    "message-wait": "Plese wait...",
+    "message-waitForPartner": "Please wait for your partner",
+    "message-maximumFileSize": "Please select file less than 10MB",
+    "message-uploadingFile": "File is being uploaded",
+    "message-redirectingToHomePage": "Redirecting to homepage",
+    "message-exitConfirm": "Are you sure to exit?",
+    "message-loggedIn": "You logged at another browser",
+    "message-cannotAccessCamera": "Can not access camera",
+    "message-cannotAccessDisplay": "Can not access display",
+    "message-waitForUploadingRecord": "Recording files are being uploaded. Please wait"
+  },
+  "vi": {
+    "chat-pleaseTypeMessage": "Vui lòng nhập...",
+    "common-chat": "Trò chuyện",
+    "common-description": "Mô tả",
+    "common-note": "Ghi chú",
+    "common-cancel": "Huỷ",
+    "common-exit": "Thoát",
+    "message-wait": "Vui lòng chờ...",
+    "message-waitForPartner": "Vui lòng chờ",
+    "message-maximumFileSize": "Vui lòng chọn file duới 10MB",
+    "message-uploadingFile": "File đang đuợc tải lên",
+    "message-redirectingToHomePage": "Đang quay về trang chủ",
+    "message-exitConfirm": "Bạn có chắc chắn muốn thoát?",
+    "message-loggedIn": "Bạn đã đăng nhập ở một trình duyệt khác",
+    "message-cannotAccessCamera": "Không thể truy cập camera",
+    "message-cannotAccessDisplay": "Không thể ghi màn hình",
+    "message-waitForUploadingRecord": "File ghi hình đang được tải lên. Vui lòng chờ"
+  }
+}

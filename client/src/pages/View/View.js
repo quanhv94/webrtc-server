@@ -7,6 +7,7 @@ import classnames from 'classnames';
 import _ from 'lodash';
 import { Button } from 'reactstrap';
 import moment from 'moment';
+import I18n from 'i18n-js';
 import { toast } from 'react-toastify';
 import peerClient from '../../util/WebRTCClient';
 import Sidebar from '../Home/Sidebar/Sidebar';
@@ -58,6 +59,8 @@ class View extends React.Component {
 
   listenPeerClient = () => {
     peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
+      const language = _.get(roomDetail, 'instance.language', 'en');
+      I18n.locale = language;
       if (!['MANAGER', 'PARENT'].includes(user.role)) {
         alert('Do not have permission');
         window.location.href = '/';

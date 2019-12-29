@@ -1,6 +1,7 @@
 import React from 'react';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
+import I18n from 'i18n-js';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import actions from '../../../state/chat/actions';
@@ -41,10 +42,10 @@ class ChatBox extends React.Component {
 
   sendFile = async (file) => {
     if (file.size > 1024 * 1024 * 10) {
-      toast.error('Please select file less than 10MB');
+      toast.error(I18n.t('message-maximumFileSize'));
       return;
     }
-    toast.success('File is being uploaded');
+    toast.success(I18n.t('message-uploadingFile'));
     const uploadedPath = await peerClient.uploadFile(file, 'messages');
     peerClient.sendMessage({
       content: '',

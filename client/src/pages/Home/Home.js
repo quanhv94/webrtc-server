@@ -5,6 +5,7 @@ import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
 import _ from 'lodash';
+import I18n from 'i18n-js';
 import { Button } from 'reactstrap';
 import moment from 'moment';
 import { toast } from 'react-toastify';
@@ -67,6 +68,8 @@ class Home extends React.Component {
   listenPeerClient = () => {
     peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
       const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
+      const language = _.get(roomDetail, 'instance.language', 'en');
+      I18n.locale = language;
       this.setState({
         currentTime,
         endingTime: moment(roomDetail.plan_start_datetime).add(roomDetail.plan_duration, 'minute'),
@@ -257,13 +260,13 @@ class Home extends React.Component {
           </div>
         </div>
         <div className={classnames('waitting-ready', { 'd-none': ready })}>
-          <h4>Please wait ...</h4>
+          <h4>{I18n.t('message-wait')}</h4>
         </div>
         <div className={classnames('error', { 'd-none': !error })}>
           <h3>{error}</h3>
         </div>
         <div className={classnames('waitting-partner-message', { 'd-none': hasPartner })}>
-          <p>Please wait for your partner</p>
+          <p>{I18n.t('message-waitForPartner')}</p>
         </div>
       </div>
     );

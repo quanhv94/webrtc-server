@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import classnames from 'classnames';
 import qs from 'qs';
 import moment from 'moment';
+import I18n from 'i18n-js';
 import { Button } from 'reactstrap';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
@@ -65,24 +66,24 @@ class ToolBar extends React.Component {
   leave = () => {
     const params = qs.parse(window.location.search, { ignoreQueryPrefix: true });
     if (!peerClient.isScreenRecordFileQueueEmpty()) {
-      toast.error('Recording files are being uploaded. Please wait');
+      toast.error(I18n.t('message-waitForUploadingRecord'));
       return;
     }
     const moveToHome = () => {
       window.onbeforeunload = null;
       peerClient.leave();
-      toast.success('Redirecting to home page');
+      toast.success(I18n.t('message-redirectingToHomePage'));
       setTimeout(() => {
         window.location.href = window.atob(params.domain);
       }, 2000);
     };
     if (!peerClient.isOutOfTime()) {
       confirmAlert({
-        message: 'Are you sure to leave?',
+        message: I18n.t('message-exitConfirm'),
         buttons: [{
-          label: 'Cancel',
+          label: I18n.t('common-cancel'),
         }, {
-          label: 'Leave',
+          label: I18n.t('common-exit'),
           onClick: moveToHome,
         }],
       });

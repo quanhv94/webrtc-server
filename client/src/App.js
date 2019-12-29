@@ -9,6 +9,8 @@ import { Helmet } from 'react-helmet';
 import { Provider } from 'react-redux';
 import { ThroughProvider } from 'react-through';
 import { ToastContainer, toast } from 'react-toastify';
+import I18n from 'i18n-js';
+import translations from './i18n/locale.json';
 import Login from './pages/Login/Login';
 import Home from './pages/Home/Home';
 import View from './pages/View/View';
@@ -23,6 +25,11 @@ import 'simple-line-icons/css/simple-line-icons.css';
 import 'rc-tree/assets/index.css';
 import './app.scss';
 import 'react-tagsinput/react-tagsinput.css';
+
+
+I18n.translations = translations;
+I18n.fallbacks = true;
+I18n.locale = 'en';
 
 const App = () => (
   <Provider store={store}>

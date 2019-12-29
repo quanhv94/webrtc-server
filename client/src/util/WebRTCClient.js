@@ -5,6 +5,7 @@ import firebase from 'firebase/app';
 import qs from 'qs';
 import 'firebase/database';
 import axios from 'axios';
+import I18n from 'i18n-js';
 import { RecordRTCPromisesHandler, invokeSaveAsDialog } from 'recordrtc';
 import _ from 'lodash';
 import uuid from 'uuid/v4';
@@ -20,25 +21,12 @@ const isTeacherOrStudent = (user) => (user.role && ['TEACHER', 'STUDENT'].includ
 /**
  * @returns { Promise<MediaStream>}
  */
-const getUserMedia = () => new Promise((resolve, reject) => {
-  window.navigator.getUserMedia = (window.navigator.getUserMedia
-    || window.navigator.webkitGetUserMedia
-    || window.navigator.mozGetUserMedia
-    || window.navigator.msGetUserMedia);
-  window.navigator.getUserMedia({ video: true, audio: true }, (stream) => {
-    resolve(stream);
-  }, (error) => {
-    reject(error);
-  });
-});
+const getUserMedia = () => window.navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
 /**
  * @returns { Promise<MediaStream>}
  */
-const getDisplayMedia = () => {
-  const displayStream = navigator.mediaDevices.getDisplayMedia({ video: true });
-  return displayStream;
-};
+const getDisplayMedia = () => window.navigator.mediaDevices.getDisplayMedia({ video: true });
 
 class PeerClient extends EventEmitter {
   constructor({ domain, token, roomCode, role }) {
@@ -80,7 +68,7 @@ class PeerClient extends EventEmitter {
       socket.on('leave', ({ leaverSocketId, leaver }) => {
         this.removePeerByReceiverSocketId(leaverSocketId);
         if (leaverSocketId === socket.id) {
-          this.emit('error', 'You logged at another browser');
+          this.emit('error', I18n.t('message-loggedIn'));
           this.leave();
         } else if (isTeacherOrStudent(leaver)) {
           this.emit('partner-leave');
@@ -358,7 +346,7 @@ class PeerClient extends EventEmitter {
       });
       return localCameraStream;
     } catch (error) {
-      this.emit('toast', { type: 'error', content: 'Can not access camera' });
+      this.emit('toast', { type: 'error', content: I18n.t('message-cannotAccessCamera') });
       return null;
     }
   }
@@ -467,7 +455,7 @@ class PeerClient extends EventEmitter {
         type: 'LOG',
       });
     } catch (error) {
-      this.emit('toast', { type: 'error', content: 'Can not access display' });
+      this.emit('toast', { type: 'error', content: I18n.t('message-cannotAccessDisplay') });
     }
   }
 
@@ -497,7 +485,7 @@ class PeerClient extends EventEmitter {
       this.emit('start-record-screen');
     } catch (error) {
       this.log(error);
-      this.emit('toast', { type: 'error', content: 'Please provide recording screen permission.' });
+      this.emit('toast', { type: 'error', content: I18n.t('message-cannotAccessDisplay') });
     }
   }
 

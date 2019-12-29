@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button, Input } from 'reactstrap';
 import PropTypes from 'prop-types';
+import I18n from 'i18n-js';
 import Dropzone from 'react-dropzone';
 
 export default class Form extends React.Component {
@@ -59,7 +60,7 @@ export default class Form extends React.Component {
           </Dropzone>
           <Input
             type="text"
-            placeholder="Type message..."
+            placeholder={I18n.t('chat-pleaseTypeMessage')}
             value={text}
             onChange={this.onChange}
             onKeyDown={this.onKeyDown}

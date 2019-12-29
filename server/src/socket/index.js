@@ -7,10 +7,10 @@ import request from 'request-promise';
 
 const checkRoom = async ({ domain, roomCode, token, role }) => {
   try {
-    let uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
-    if (role === 'MANAGER') {
-      uri = 'http://test.e-school.rabita.vn/api/v1/class-lecture/load-data?lectureId=113&role=TEACHER&token=e0c7d790a4b9604da333ff80d0cd687f';
-    }
+    const uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
+    // if (role === 'MANAGER') {
+    //   uri = 'http://test.e-school.rabita.vn/api/v1/class-lecture/load-data?lectureId=113&role=TEACHER&token=e0c7d790a4b9604da333ff80d0cd687f';
+    // }
     console.log(uri);
     const response = await request({
       uri,
@@ -23,10 +23,10 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
     }
     const { user, lecture, instance } = data.data;
     const { storageConfig, chatRoomConfig, toolConfig, teacher, student } = lecture;
-    if (role === 'MANAGER') {
-      user.user_id = 10000;
-      user.role = role;
-    }
+    // if (role === 'MANAGER') {
+    //   user.user_id = 10000;
+    //   user.role = role;
+    // }
     const roomDetail = {
       name: lecture.class.name,
       description: lecture.class.description,

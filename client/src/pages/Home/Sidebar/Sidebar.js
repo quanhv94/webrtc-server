@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { Resizable } from 're-resizable';
 import classnames from 'classnames';
+import I18n from 'i18n-js';
 import PropType from 'prop-types';
 import { TabContent, TabPane, Nav, NavItem, NavLink, Badge } from 'reactstrap';
 import actions from '../../../state/sidebar/actions';
@@ -76,7 +77,7 @@ class Sidebar extends React.Component {
               className={classnames({ active: activeTab === 'Chat' })}
               onClick={() => { this.toggle('Chat'); }}
             >
-              Chat
+              {I18n.t('common-chat')}
               {chat.totalUnread > 0 && (
                 <Badge color="danger round" style={{ marginLeft: 10 }}>{chat.totalUnread}</Badge>
               )}
@@ -87,7 +88,7 @@ class Sidebar extends React.Component {
               className={classnames({ active: activeTab === 'Description' })}
               onClick={() => { this.toggle('Description'); }}
             >
-              Description
+              {I18n.t('common-description')}
             </NavLink>
           </NavItem>
           <NavItem>
@@ -95,7 +96,7 @@ class Sidebar extends React.Component {
               className={classnames({ active: activeTab === 'Note' })}
               onClick={() => { this.toggle('Note'); }}
             >
-              Note
+              {I18n.t('common-note')}
             </NavLink>
           </NavItem>
         </Nav>
