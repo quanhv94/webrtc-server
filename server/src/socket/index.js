@@ -243,6 +243,17 @@ const setupSocket = (server) => {
     socket.on('screen-stream-ended', (data) => {
       io.to(socket.data.roomCode).emit('screen-stream-ended', data);
     });
+    socket.on('log-action', ({ uri, actualLog }) => {
+      request({
+        uri,
+        method: 'POST',
+        form: {
+          actual_log: actualLog,
+        },
+      })
+        .then(console.log)
+        .catch(console.log);
+    });
   });
 };
 

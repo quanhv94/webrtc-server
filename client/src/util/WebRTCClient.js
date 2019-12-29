@@ -29,10 +29,14 @@ const getUserMedia = () => window.navigator.mediaDevices.getUserMedia({ video: t
 const getDisplayMedia = () => window.navigator.mediaDevices.getDisplayMedia({ video: true });
 
 class PeerClient extends EventEmitter {
-  constructor({ domain, token, roomCode, role }) {
+  constructor({ domain, token, lessonId, role }) {
     super();
+    const roomCode = lessonId;
     if (!domain || !token || !roomCode || !role) return;
     this.data = {
+      domain,
+      token,
+      lessonId,
       roomCode,
       cameraOn: true,
       microphoneOn: true,
@@ -65,6 +69,7 @@ class PeerClient extends EventEmitter {
         content: `${this.getUser().full_name} joined`,
         type: 'LOG',
       });
+      this.logAction({ action: 'IN' });
       socket.on('leave', ({ leaverSocketId, leaver }) => {
         this.removePeerByReceiverSocketId(leaverSocketId);
         if (leaverSocketId === socket.id) {
@@ -107,6 +112,10 @@ class PeerClient extends EventEmitter {
 
   setUser = (user) => { this.data.user = user; };
   getUser = () => this.data.user;
+
+  getDomain = () => this.data.domain;
+  getToken = () => this.data.token;
+  getLessonId = () => this.data.lessonId;
 
   setRoomCode = (roomCode) => { this.data.roomCode = roomCode; };
   getRoomCode = () => this.data.roomCode;
@@ -250,11 +259,11 @@ class PeerClient extends EventEmitter {
 
   sendMessage = ({ content = '', type = 'TEXT', file = null }) => {
     if (!isTeacherOrStudent(this.getUser())) {
-      this.log('Only teacher and student can send message');
+      this.consoleLog('Only teacher and student can send message');
       return;
     }
     if (type === 'LOG' && process.env.NODE_ENV === 'development') {
-      this.log('LOG message', content);
+      this.consoleLog('LOG message', content);
       return;
     }
     const chatRoomConfig = this.getChatRoomConfig();
@@ -318,7 +327,7 @@ class PeerClient extends EventEmitter {
   }
 
   playSoundEffect = (name) => {
-    this.log(`Play sound: ${name}`);
+    this.consoleLog(`Play sound: ${name}`);
     const audio = new Audio();
     audio.src = `/audio/${name}.mp3`;
     audio.play();
@@ -391,7 +400,7 @@ class PeerClient extends EventEmitter {
 
     peer.on('data', (data) => {
       const str = data.toString();
-      this.log('--on data--', str);
+      this.consoleLog('--on data--', str);
     });
 
     peer.on('stream', (stream) => {
@@ -481,10 +490,10 @@ class PeerClient extends EventEmitter {
       recordScreenStream.getVideoTracks()[0].addEventListener('ended', this.stopRecordScreen);
       this.setRecordScreenStream(recordScreenStream);
       this.startRecordScreen();
-      this.log('start record screen');
+      this.consoleLog('start record screen');
       this.emit('start-record-screen');
     } catch (error) {
-      this.log(error);
+      this.consoleLog(error);
       this.emit('toast', { type: 'error', content: I18n.t('message-cannotAccessDisplay') });
     }
   }
@@ -499,7 +508,7 @@ class PeerClient extends EventEmitter {
   }
 
   stopRecordScreen = async () => {
-    this.log('stop record screen');
+    this.consoleLog('stop record screen');
     const recorder = this.getScreenRecorder();
     const recordScreenStream = this.getRecordScreenStream();
     if (!recorder || !recordScreenStream) return;
@@ -519,11 +528,12 @@ class PeerClient extends EventEmitter {
     const fileId = uuid();
     file.id = fileId;
     this.addFileToSreenRecordFileQueue(file);
-    this.log('record file queue', this.getSreenRecordFileQueue());
+    this.consoleLog('record file queue', this.getSreenRecordFileQueue());
     this.startRecordScreen();
     try {
+      // console.log(window.bind.cs.d.w.d);
       const path = await this.uploadFile(file, 'recorders');
-      this.log(`Saved screen record to server ${path}`);
+      this.consoleLog(`Saved screen record to server ${path}`);
       this.sendMessage({
         content: `Lesson recording (${moment().format('YYYY-MM-DD HH:mm:ss')})`,
         file: {
@@ -535,10 +545,10 @@ class PeerClient extends EventEmitter {
       });
     } catch {
       invokeSaveAsDialog(blob, `${Date.now()}_video.webm`);
-      this.log('Saved screen record to local');
+      this.consoleLog('Saved screen record to local');
     } finally {
       this.removeFileFromScreenRecordFileQueue(fileId);
-      this.log('record file queue', this.getSreenRecordFileQueue());
+      this.consoleLog('record file queue', this.getSreenRecordFileQueue());
     }
   }
 
@@ -571,6 +581,7 @@ class PeerClient extends EventEmitter {
   })
 
   leave = () => {
+    this.logAction({ action: 'OUT' });
     this.removeAllPeers();
     this.stopRecordScreen();
     this.sendMessage({
@@ -582,15 +593,21 @@ class PeerClient extends EventEmitter {
 
   static isSupported = () => Peer.WEBRTC_SUPPORT;
 
-  log = (...params) => {
+  consoleLog = (...params) => {
     if (process.env.NODE_ENV === 'development') {
       console.log(...params);
     }
   }
+
+  logAction = ({ action = 'IN' }) => {
+    const uri = `${this.getDomain()}/api/v1/class-lecture/save-data?token=${this.getToken()}&lectureId=${this.getLessonId()}`;
+    const actualLog = JSON.stringify({ action, userId: this.getUser().user_id });
+    socket.emit('log-action', { uri, actualLog });
+  }
 }
 
 const params = qs.parse(window.location.search, { ignoreQueryPrefix: true });
-const { domain, token, lessonId: roomCode, role } = params;
-const peerClient = new PeerClient({ domain: atob(domain || ''), token, roomCode, role });
+const { domain, token, lessonId, role } = params;
+const peerClient = new PeerClient({ domain: atob(domain || ''), token, lessonId, role });
 
 export default peerClient;
