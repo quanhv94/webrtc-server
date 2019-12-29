@@ -407,11 +407,9 @@ class PeerClient extends EventEmitter {
     peer.on('stream', (stream) => {
       if (!peer.hasRemoteCameraStream) {
         peer.hasRemoteCameraStream = true;
-        this.saveRecordScreen();
+        this.setRemoteCameraStream(stream);
         this.emit('camera-stream', { stream, user: peer.receiver });
-        if (this.getRecordScreenStream()) {
-          this.getRecordScreenStream().addTrack(stream.getAudioTracks()[0]);
-        }
+        this.saveRecordScreen();
       } else {
         this.setRemoteScreenStream(stream);
         this.emit('screen-stream', { stream, user: peer.receiver });
