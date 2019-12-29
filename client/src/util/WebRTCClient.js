@@ -5,6 +5,7 @@ import firebase from 'firebase/app';
 import qs from 'qs';
 import 'firebase/database';
 import axios from 'axios';
+import VideoStreamMerger from 'video-stream-merger';
 import I18n from 'i18n-js';
 import { RecordRTCPromisesHandler, invokeSaveAsDialog } from 'recordrtc';
 import _ from 'lodash';
@@ -406,7 +407,7 @@ class PeerClient extends EventEmitter {
     peer.on('stream', (stream) => {
       if (!peer.hasRemoteCameraStream) {
         peer.hasRemoteCameraStream = true;
-        this.setRemoteCameraStream(stream);
+        this.saveRecordScreen();
         this.emit('camera-stream', { stream, user: peer.receiver });
         if (this.getRecordScreenStream()) {
           this.getRecordScreenStream().addTrack(stream.getAudioTracks()[0]);
@@ -481,12 +482,6 @@ class PeerClient extends EventEmitter {
   requestRecordScreen = async () => {
     try {
       const recordScreenStream = await getDisplayMedia();
-      const localCameraStream = this.getLocalCameraStream();
-      recordScreenStream.addTrack(localCameraStream.getAudioTracks()[0]);
-      const remoteCameraStream = this.getRemoteCameraStream();
-      if (remoteCameraStream) {
-        recordScreenStream.addTrack(remoteCameraStream.getAudioTracks()[0]);
-      }
       recordScreenStream.getVideoTracks()[0].addEventListener('ended', this.stopRecordScreen);
       this.setRecordScreenStream(recordScreenStream);
       this.startRecordScreen();
@@ -498,13 +493,45 @@ class PeerClient extends EventEmitter {
     }
   }
 
-  startRecordScreen = async () => {
+  getMixedRecordScreenStream = () => {
+    const localCameraStream = this.getLocalCameraStream();
+    const remoteCameraStream = this.getRemoteCameraStream();
     const recordScreenStream = this.getRecordScreenStream();
-    if (!recordScreenStream) return;
-    const recorder = new RecordRTCPromisesHandler(recordScreenStream, { type: 'video', disableLogs: true });
+    if (!recordScreenStream) return null;
+    if (!recordScreenStream.getAudioTracks().length) {
+      recordScreenStream.addTrack(localCameraStream.getAudioTracks()[0]);
+    }
+
+    const { width, height } = recordScreenStream.getVideoTracks()[0].getSettings();
+
+    const merger = new VideoStreamMerger({ width, height });
+    if (remoteCameraStream) {
+      merger.addStream(remoteCameraStream, { x: 0, y: 0, width: 1, height: 1 });
+    }
+    merger.addStream(recordScreenStream, {
+      x: 0,
+      y: 0,
+      width,
+      height,
+    });
+    merger.start();
+    return merger.result;
+  }
+
+  startRecordScreen = async () => {
+    const stream = this.getMixedRecordScreenStream();
+    if (!stream) return;
+    const recorder = new RecordRTCPromisesHandler(stream, { type: 'video', disableLogs: true });
+    const recorderId = uuid();
+    recorder.recorderId = recorderId;
     await recorder.startRecording();
     this.setScreenRecorder(recorder);
-    setTimeout(() => this.saveRecordScreen(), SCREEN_RECORD_TIME_LIMIT);
+    setTimeout(() => {
+      const currentRecorder = this.getScreenRecorder();
+      if (currentRecorder && currentRecorder.recorderId === recorderId) {
+        this.saveRecordScreen();
+      }
+    }, SCREEN_RECORD_TIME_LIMIT);
   }
 
   stopRecordScreen = async () => {
@@ -512,7 +539,6 @@ class PeerClient extends EventEmitter {
     const recorder = this.getScreenRecorder();
     const recordScreenStream = this.getRecordScreenStream();
     if (!recorder || !recordScreenStream) return;
-    recordScreenStream.getTracks().forEach((x) => x.stop());
     this.saveRecordScreen();
     this.setScreenRecorder(null);
     this.setRecordScreenStream(null);
@@ -531,7 +557,6 @@ class PeerClient extends EventEmitter {
     this.consoleLog('record file queue', this.getSreenRecordFileQueue());
     this.startRecordScreen();
     try {
-      // console.log(window.bind.cs.d.w.d);
       const path = await this.uploadFile(file, 'recorders');
       this.consoleLog(`Saved screen record to server ${path}`);
       this.sendMessage({
