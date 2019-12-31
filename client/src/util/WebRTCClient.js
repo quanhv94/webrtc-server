@@ -397,7 +397,9 @@ class PeerClient extends EventEmitter {
       if (this.getLocalScreenStream()) {
         peer.addStream(this.getLocalScreenStream());
       }
-      this.sendAllConfig();
+      if (isTeacherOrStudent(this.getUser())) {
+        this.sendAllConfig();
+      }
     });
 
     peer.on('data', (data) => {
