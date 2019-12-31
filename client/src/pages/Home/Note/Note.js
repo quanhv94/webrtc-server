@@ -4,6 +4,7 @@ import _ from 'lodash';
 import { Input } from 'reactstrap';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
+import { Resizable } from 're-resizable';
 import actions from '../../../state/note/actions';
 import peerClient from '../../../util/WebRTCClient';
 import './style.scss';
@@ -47,12 +48,40 @@ class Note extends React.Component {
     this.saveNote(content);
   }
 
+  onResize = (event, position, element) => {
+    const { height } = element.style;
+    const nextSiblingHeight = `${100 - parseFloat(height)}%`;
+    element.nextSibling.style.height = nextSiblingHeight;
+  }
+
   render() {
     const { notes, currentUser } = this.props;
     return (
       <div className="notes-container">
-        {notes.map((note) => (
-          <div key={note.userId} className="note">
+        {notes.map((note, index) => (
+          <Resizable
+            key={note.userId}
+            className="note"
+            ref={(ref) => { this.sidebarRef = ref; }}
+            bounds="parent"
+            maxHeight="80%"
+            minHeight="20%"
+            defaultSize={{
+              width: '100%',
+              height: '50%',
+            }}
+            handleStyles={{
+              left: { display: 'none' },
+              topLeft: { display: 'none' },
+              top: { display: 'none' },
+              topRight: { display: 'none' },
+              right: { display: 'none' },
+              bottomRight: { display: 'none' },
+              bottom: index === 0 ? { backgroundColor: '#ccc', zIndex: 10 } : { display: 'none' },
+              bottomLeft: { display: 'none' },
+            }}
+            onResize={this.onResize}
+          >
             <div className="nav-link">{note.first_name}</div>
             <div className="note-content">
               <Input
@@ -63,7 +92,7 @@ class Note extends React.Component {
                 readOnly={note.userId !== currentUser.user_id}
               />
             </div>
-          </div>
+          </Resizable>
         ))}
       </div>
     );

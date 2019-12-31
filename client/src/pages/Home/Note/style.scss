@@ -1,23 +1,19 @@
 .notes-container {
-  height: 100%;
-  display: flex;
+  height: calc(100vh - 130px);
   flex-direction: column;
   .note {
-    flex: 1;
+    min-height: 120px;
+    max-height: calc(100% - 120px);
     display: flex;
     flex-direction: column;
     .note-content {
       padding: 10px;
+      padding-bottom: 15px;
       flex: 1;
     }
     textarea {
       box-shadow: none !important;
       height: 100%;
     }
-  }
-}
-.sidebar.large {
-  .notes-container {
-    flex-direction: row;
   }
 }

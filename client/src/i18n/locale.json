@@ -1,6 +1,8 @@
 {
   "en": {
     "chat-pleaseTypeMessage": "Please type message...",
+    "common-share": "Share",
+    "common-record": "Record",
     "common-chat": "Chat",
     "common-description": "Description",
     "common-note": "Note",
@@ -19,6 +21,8 @@
   },
   "vi": {
     "chat-pleaseTypeMessage": "Vui lòng nhập...",
+    "common-share": "Chia sẻ",
+    "common-record": "Ghi lại",
     "common-chat": "Trò chuyện",
     "common-description": "Mô tả",
     "common-note": "Ghi chú",

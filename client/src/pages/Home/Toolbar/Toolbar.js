@@ -105,6 +105,7 @@ class ToolBar extends React.Component {
             onClick={this.toggleShareScreen}
           >
             <i className="icon-screen-desktop" />
+            {I18n.t('common-share')}
           </Button>
         </Ability>
         <Ability userRole={currentUser.role} accessibleRoles="TEACHER">
@@ -114,6 +115,7 @@ class ToolBar extends React.Component {
             onClick={this.toggleRecordScreen}
           >
             <i className="fa fa-dot-circle-o" />
+            {I18n.t('common-record')}
             {isRecordingScreen && (
               <span className="small recording-time">
                 {moment().startOf('day').seconds(screenRecordingTime).format('HH:mm:ss')}
@@ -126,6 +128,7 @@ class ToolBar extends React.Component {
           onClick={this.leave}
         >
           <i className="fa fa-times-circle-o" />
+          {I18n.t('common-exit')}
         </Button>
       </div>
     );

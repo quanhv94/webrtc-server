@@ -108,6 +108,9 @@
           position: relative;
           color: #fff;
           box-shadow: none;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           &.active {
             color: red;
           }
@@ -115,7 +118,7 @@
         .recording-time {
           position: absolute;
           pointer-events: none;
-          bottom: -10px;
+          top: -10px;
           left: 50%;
           display: inline-block;
           transform: translateX(-50%);

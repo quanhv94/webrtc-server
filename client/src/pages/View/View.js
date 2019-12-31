@@ -61,7 +61,7 @@ class View extends React.Component {
     peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
       const language = _.get(roomDetail, 'instance.language', 'en');
       I18n.locale = language;
-      if (!['MANAGER', 'PARENT'].includes(user.role)) {
+      if (!['MANAGER', 'PARENT', 'ADMIN'].includes(user.role)) {
         alert('Do not have permission');
         window.location.href = '/';
       }

@@ -205,7 +205,7 @@ class Home extends React.Component {
             <StreamVideo stream={remoteScreenStream ? remoteCameraStream : null} />
           </div>
         </div>
-        <div className="header-center d-none d-md-block">
+        <div className="header-center d-none d-md-flex">
           <h4>{`${_.get(room, 'instance.instance_name')}-${room.name}`}</h4>
           <div>{`Hi, ${currentUser && currentUser.full_name}`}</div>
         </div>
