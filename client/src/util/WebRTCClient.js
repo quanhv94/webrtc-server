@@ -349,6 +349,7 @@ class PeerClient extends EventEmitter {
         this.setCameraStatus(userConfig.cameraOn);
         localCameraStream.getAudioTracks()[0].enabled = userConfig.microphoneOn;
         this.setMicrophoneStatus(userConfig.microphoneOn);
+        this.sendAllConfig();
       }
       this.getPeers().forEach((peer) => {
         peer.addedStreamFlag = true;

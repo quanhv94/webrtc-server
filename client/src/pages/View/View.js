@@ -87,42 +87,47 @@ class View extends React.Component {
       this.setState({ ready: true });
     });
     peerClient.on('camera-stream', ({ stream, user }) => {
-      const { teacher } = this.state;
+      const { teacher, student } = this.state;
       if (teacher.userId === user.user_id) {
         this.setState({ teacherCameraStream: stream });
-      } else {
+      }
+      if (student.userId === user.user_id) {
         this.setState({ studentCameraStream: stream });
       }
     });
     peerClient.on('screen-stream', ({ stream, user }) => {
-      const { teacher } = this.state;
+      const { teacher, student } = this.state;
       if (teacher.userId === user.user_id) {
         this.setState({ teacherScreenStream: stream });
-      } else {
+      }
+      if (student.userId === user.user_id) {
         this.setState({ studentScreenStream: stream });
       }
     });
     peerClient.on('screen-stream-ended', ({ userId }) => {
-      const { teacher } = this.state;
+      const { teacher, student } = this.state;
       if (teacher.userId === userId) {
         this.setState({ teacherScreenStream: null });
-      } else {
+      }
+      if (student.userId === userId) {
         this.setState({ studentScreenStream: null });
       }
     });
     peerClient.on('turn-camera', ({ userId, status }) => {
-      const { teacher } = this.state;
+      const { teacher, student } = this.state;
       if (teacher.userId === userId) {
         this.setState({ teacherCameraOn: status });
-      } else {
+      }
+      if (student.userId === userId) {
         this.setState({ studentCameraOn: status });
       }
     });
     peerClient.on('turn-microphone', ({ userId, status }) => {
-      const { teacher } = this.state;
+      const { teacher, student } = this.state;
       if (teacher.userId === userId) {
         this.setState({ teacherMicrophoneOn: status });
-      } else {
+      }
+      if (student.userId === userId) {
         this.setState({ studentMicrophoneOn: status });
       }
     });
