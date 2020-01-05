@@ -8,14 +8,11 @@ import request from 'request-promise';
 const checkRoom = async ({ domain, roomCode, token, role }) => {
   try {
     const uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
-    // if (role === 'MANAGER') {
-    //   uri = 'http://test.e-school.rabita.vn/api/v1/class-lecture/load-data?lectureId=113&role=TEACHER&token=e0c7d790a4b9604da333ff80d0cd687f';
-    // }
-    console.log(uri);
     const response = await request({
       uri,
       json: true,
     });
+    console.log(uri);
     const { data } = response;
     if (!data.success) {
       const { message } = data;
@@ -23,10 +20,6 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
     }
     const { user, lecture, instance } = data.data;
     const { storageConfig, chatRoomConfig, toolConfig, teacher, student } = lecture;
-    // if (role === 'MANAGER') {
-    //   user.user_id = 10000;
-    //   user.role = role;
-    // }
     const roomDetail = {
       name: lecture.class.name,
       description: lecture.class.description,
@@ -35,7 +28,7 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
       instance,
     };
     return { user, roomDetail, storageConfig, chatRoomConfig, toolConfig, teacher, student };
-  } catch {
+  } catch (e) {
     return { error: 'Can\'t connect to server' };
   }
 };
@@ -112,6 +105,15 @@ const setupSocket = (server) => {
   const io = socketIO(server);
   io.on('connection', (socket) => {
     socket.data = {};
+    socket.on('get-user-info', async ({ domain, token, roomCode, role }) => {
+      const roomData = await checkRoom({ domain, token, roomCode, role });
+      const { user, error } = roomData;
+      if (user) {
+        socket.emit('get-user-info', { user });
+      } else {
+        socket.emit('error-message', error);
+      }
+    });
     socket.on('join', async ({ domain, token, roomCode, role }) => {
       socket.data.roomCode = roomCode;
       const roomData = await checkRoom({ domain, token, roomCode, role });
@@ -126,7 +128,7 @@ const setupSocket = (server) => {
         student,
       } = roomData;
       if (error) {
-        socket.emit('error', error);
+        socket.emit('error-message', error);
         return;
       }
       user.socketId = socket.id;
@@ -250,9 +252,7 @@ const setupSocket = (server) => {
         form: {
           actual_log: actualLog,
         },
-      })
-        .then(console.log)
-        .catch(console.log);
+      });
     });
   });
 };

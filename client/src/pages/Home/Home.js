@@ -66,8 +66,12 @@ class Home extends React.Component {
   }
 
   listenPeerClient = () => {
+    peerClient.on('current-user', (user) => {
+      const { setCurrentUser } = this.props;
+      setCurrentUser(user);
+    });
     peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
-      const { setCurrentUser, setRoom, setCamera, setMicrophone } = this.props;
+      const { setRoom, setCamera, setMicrophone } = this.props;
       const language = _.get(roomDetail, 'instance.language', 'en');
       I18n.locale = language;
       this.setState({
@@ -80,7 +84,6 @@ class Home extends React.Component {
         setMicrophone(userConfig.microphoneOn);
       }
       setRoom(roomDetail);
-      setCurrentUser(user);
       if (process.env.NODE_ENV !== 'development') {
         window.onbeforeunload = (event) => {
           event.returnValue = 'Are you sure to leave?';
@@ -137,7 +140,7 @@ class Home extends React.Component {
     peerClient.on('toast', (message) => {
       toast[message.type](message.content);
     });
-    peerClient.on('error', (error) => {
+    peerClient.on('error-message', (error) => {
       const { setError } = this.props;
       setError(error);
     });

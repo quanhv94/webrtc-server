@@ -49,18 +49,27 @@ class PeerClient extends EventEmitter {
         this.getPeerByReceiverSocketId(sender.socketId).signal(signal);
       }
     });
-    socket.emit('join', { domain, token, roomCode, role });
+    socket.emit('get-user-info', { domain, token, roomCode, role });
+    socket.once('get-user-info', async ({ user }) => {
+      this.setUser(user);
+      this.emit('current-user', user);
+      if (isTeacherOrStudent(user)) {
+        const stream = await this.requestCameraStream();
+        if (stream) {
+          socket.emit('join', { domain, token, roomCode, role });
+        }
+      } else {
+        socket.emit('join', { domain, token, roomCode, role });
+      }
+    });
+
     socket.once('join-success', async ({ user, roomDetail, storageConfig, chatRoomConfig, toolConfig, currentTime, teacher, student }) => {
       this.emit('join-success', { user, roomDetail, storageConfig, chatRoomConfig, toolConfig, currentTime });
+      this.emit('ready');
       this.emit('teacher-info', teacher);
       this.emit('student-info', student);
       this.setUser(user);
       this.setRoom(roomDetail);
-      if (isTeacherOrStudent(user)) {
-        this.requestCameraStream();
-      } else {
-        this.emit('ready');
-      }
       this.setStorageConfig(storageConfig);
       this.setChatRoomConfig(chatRoomConfig);
       this.setToolConfig(toolConfig);
@@ -74,7 +83,7 @@ class PeerClient extends EventEmitter {
       socket.on('leave', ({ leaverSocketId, leaver }) => {
         this.removePeerByReceiverSocketId(leaverSocketId);
         if (leaverSocketId === socket.id) {
-          this.emit('error', I18n.t('message-loggedIn'));
+          this.emit('error-message', I18n.t('message-loggedIn'));
           this.leave();
         } else if (isTeacherOrStudent(leaver)) {
           this.emit('partner-leave');
@@ -102,12 +111,12 @@ class PeerClient extends EventEmitter {
         this.emit('screen-stream-ended', { userId });
       });
     });
-    socket.on('error', (error) => {
+    socket.on('error-message', (error) => {
       this.removeAllPeers();
-      this.emit('error', error);
+      this.emit('error-message', error);
     });
     socket.on('disconnect', () => {
-      this.emit('error', 'Disconnected');
+      this.emit('error-message', 'Disconnected');
     });
   }
 
@@ -338,7 +347,6 @@ class PeerClient extends EventEmitter {
     try {
       const localCameraStream = await getUserMedia();
       this.setLocalCameraStream(localCameraStream);
-      this.emit('ready');
       this.emit('camera-stream', {
         user: this.getUser(),
         stream: localCameraStream,
@@ -357,7 +365,7 @@ class PeerClient extends EventEmitter {
       });
       return localCameraStream;
     } catch (error) {
-      this.emit('toast', { type: 'error', content: I18n.t('message-cannotAccessCamera') });
+      this.emit('error-message', I18n.t('message-cannotAccessCamera'));
       return null;
     }
   }

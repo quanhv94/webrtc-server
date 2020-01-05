@@ -58,21 +58,24 @@ class View extends React.Component {
   }
 
   listenPeerClient = () => {
-    peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
-      const language = _.get(roomDetail, 'instance.language', 'en');
-      I18n.locale = language;
+    peerClient.on('current-user', (user) => {
+      const { setCurrentUser } = this.props;
+      setCurrentUser(user);
       if (!['MANAGER', 'PARENT', 'ADMIN'].includes(user.role)) {
         alert('Do not have permission');
         window.location.href = '/';
       }
-      const { setCurrentUser, setRoom } = this.props;
+    });
+    peerClient.on('join-success', ({ roomDetail, currentTime }) => {
+      const language = _.get(roomDetail, 'instance.language', 'en');
+      I18n.locale = language;
+      const { setRoom } = this.props;
       this.setState({
         currentTime,
         endingTime: moment(roomDetail.plan_start_datetime).add(roomDetail.plan_duration, 'minute'),
       });
 
       setRoom(roomDetail);
-      setCurrentUser(user);
       // window.onbeforeunload = (event) => {
       //   event.returnValue = 'Are you sure to leave?';
       // };
@@ -143,7 +146,7 @@ class View extends React.Component {
     peerClient.on('toast', (message) => {
       toast[message.type](message.content);
     });
-    peerClient.on('error', (error) => {
+    peerClient.on('error-message', (error) => {
       const { setError } = this.props;
       setError(error);
     });
