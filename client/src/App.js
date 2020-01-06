@@ -1,3 +1,4 @@
+/* eslint-disable react/no-danger */
 import React from 'react';
 import {
   Router,
@@ -9,6 +10,7 @@ import { Helmet } from 'react-helmet';
 import { Provider } from 'react-redux';
 import { ThroughProvider } from 'react-through';
 import { ToastContainer, toast } from 'react-toastify';
+import { Modal, ModalBody } from 'reactstrap';
 import I18n from 'i18n-js';
 import translations from './i18n/locale.json';
 import Login from './pages/Login/Login';
@@ -29,31 +31,54 @@ import 'react-tagsinput/react-tagsinput.css';
 
 I18n.translations = translations;
 I18n.fallbacks = true;
-I18n.locale = 'en';
+I18n.locale = (navigator.language || navigator.userLanguage || 'en').split('-').shift();
 
-const App = () => (
-  <Provider store={store}>
-    <ThroughProvider>
-      <div className="App">
-        <Helmet>
-          <title>Rabita Call</title>
-        </Helmet>
-        <Router history={history}>
-          <Switch>
-            <Route exact path="/" component={Login} />
-            <Route exact path="/learn" component={Home} />
-            <Route exact path="/view" component={View} />
-            <Redirect to="/" />
-          </Switch>
-        </Router>
-        <ToastContainer
-          hideProgressBar
-          position={toast.POSITION.TOP_CENTER}
-          closeButton={false}
-        />
-      </div>
-    </ThroughProvider>
-  </Provider>
-);
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isChrome: (!!window.chrome && !!window.chrome.runtime),
+    };
+  }
+
+  render() {
+    const { isChrome } = this.state;
+    return (
+      <Provider store={store}>
+        <ThroughProvider>
+          <div className="App">
+            <Helmet>
+              <title>Rabita Call</title>
+            </Helmet>
+            {isChrome && (
+              <Router history={history}>
+                <Switch>
+                  <Route exact path="/" component={Login} />
+                  <Route exact path="/learn" component={Home} />
+                  <Route exact path="/view" component={View} />
+                  <Redirect to="/" />
+                </Switch>
+              </Router>
+            )}
+            <ToastContainer
+              hideProgressBar
+              position={toast.POSITION.TOP_CENTER}
+              closeButton={false}
+            />
+          </div>
+        </ThroughProvider>
+        <Modal isOpen={!isChrome} zIndex="3600" backdropClassName="black">
+          <ModalBody className="text-center">
+            <p dangerouslySetInnerHTML={{ __html: I18n.t('message-browserSupport') }} />
+            <a href="https://www.google.com/chrome">
+              <img src="https://www.google.com/chrome/static/images/chrome-logo.svg" alt="chrome logo" />
+              <p>Download Chrome</p>
+            </a>
+          </ModalBody>
+        </Modal>
+      </Provider>
+    );
+  }
+}
 
 export default App;
