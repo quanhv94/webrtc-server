@@ -347,9 +347,13 @@ class PeerClient extends EventEmitter {
 
   playSoundEffect = (name) => {
     this.consoleLog(`Play sound: ${name}`);
-    const audio = new Audio();
-    audio.src = `/audio/${name}.mp3`;
-    audio.play();
+    try {
+      const audio = new Audio();
+      audio.src = `/audio/${name}.mp3`;
+      audio.play();
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   requestCameraStream = async () => {
