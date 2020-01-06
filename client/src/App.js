@@ -37,7 +37,7 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      isChrome: (!!window.chrome && !!window.chrome.runtime),
+      isChrome: (!!window.chrome) || navigator.userAgent.match('CriOS'),
     };
   }
 
