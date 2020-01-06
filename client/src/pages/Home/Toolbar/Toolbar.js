@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
-import qs from 'qs';
 import moment from 'moment';
 import I18n from 'i18n-js';
 import { Button } from 'reactstrap';
@@ -64,7 +63,6 @@ class ToolBar extends React.Component {
   }
 
   leave = () => {
-    const params = qs.parse(window.location.search, { ignoreQueryPrefix: true });
     if (!peerClient.isScreenRecordFileQueueEmpty()) {
       toast.error(I18n.t('message-waitForUploadingRecord'));
       return;
@@ -73,9 +71,7 @@ class ToolBar extends React.Component {
       window.onbeforeunload = null;
       peerClient.leave();
       toast.success(I18n.t('message-redirectingToHomePage'));
-      setTimeout(() => {
-        window.location.href = window.atob(params.domain);
-      }, 2000);
+      setTimeout(peerClient.backToHomePage, 2000);
     };
     if (!peerClient.isOutOfTime()) {
       confirmAlert({

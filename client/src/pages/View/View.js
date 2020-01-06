@@ -64,6 +64,8 @@ class View extends React.Component {
       if (!['MANAGER', 'PARENT', 'ADMIN'].includes(user.role)) {
         alert('Do not have permission');
         window.location.href = '/';
+      } else {
+        peerClient.startJoin();
       }
     });
     peerClient.on('join-success', ({ roomDetail, currentTime }) => {

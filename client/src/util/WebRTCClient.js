@@ -32,13 +32,12 @@ const getDisplayMedia = () => window.navigator.mediaDevices.getDisplayMedia({ vi
 class PeerClient extends EventEmitter {
   constructor({ domain, token, lessonId, role }) {
     super();
-    const roomCode = lessonId;
-    if (!domain || !token || !roomCode || !role) return;
+    if (!domain || !token || !lessonId || !role) return;
     this.data = {
       domain,
       token,
       lessonId,
-      roomCode,
+      role,
       cameraOn: true,
       microphoneOn: true,
       screenRecordFileQueue: [],
@@ -49,18 +48,11 @@ class PeerClient extends EventEmitter {
         this.getPeerByReceiverSocketId(sender.socketId).signal(signal);
       }
     });
-    socket.emit('get-user-info', { domain, token, roomCode, role });
-    socket.once('get-user-info', async ({ user }) => {
+    socket.emit('get-user-info', { domain, token, lessonId, role });
+    socket.once('get-user-info', async ({ user, language }) => {
       this.setUser(user);
+      this.emit('language', language);
       this.emit('current-user', user);
-      if (isTeacherOrStudent(user)) {
-        const stream = await this.requestCameraStream();
-        if (stream) {
-          socket.emit('join', { domain, token, roomCode, role });
-        }
-      } else {
-        socket.emit('join', { domain, token, roomCode, role });
-      }
     });
 
     socket.once('join-success', async ({ user, roomDetail, storageConfig, chatRoomConfig, toolConfig, currentTime, teacher, student }) => {
@@ -79,7 +71,6 @@ class PeerClient extends EventEmitter {
         content: `${this.getUser().full_name} joined`,
         type: 'LOG',
       });
-      this.logAction({ action: 'IN' });
       socket.on('leave', ({ leaverSocketId, leaver }) => {
         this.removePeerByReceiverSocketId(leaverSocketId);
         if (leaverSocketId === socket.id) {
@@ -113,10 +104,19 @@ class PeerClient extends EventEmitter {
     });
     socket.on('error-message', (error) => {
       this.removeAllPeers();
-      this.emit('error-message', error);
+      this.emit('error-message', error || 'Some error occurred!');
     });
     socket.on('disconnect', () => {
       this.emit('error-message', 'Disconnected');
+    });
+  }
+
+  startJoin = () => {
+    socket.emit('join', {
+      domain: this.getDomain(),
+      token: this.getToken(),
+      lessonId: this.getLessonId(),
+      role: this.getRole(),
     });
   }
 
@@ -127,8 +127,11 @@ class PeerClient extends EventEmitter {
   getToken = () => this.data.token;
   getLessonId = () => this.data.lessonId;
 
-  setRoomCode = (roomCode) => { this.data.roomCode = roomCode; };
-  getRoomCode = () => this.data.roomCode;
+  setLessonId = (lessonId) => { this.data.lessonId = lessonId; };
+  getLessonId = () => this.data.lessonId;
+
+  setRole = (role) => { this.data.role = role; };
+  getRole = () => this.data.role;
 
   setRoom = (room) => { this.data.room = room; }
   getRoom = () => this.data.room;
@@ -232,6 +235,11 @@ class PeerClient extends EventEmitter {
     return moment().diff(moment(endingTime), 'second') > 0;
   }
 
+  backToHomePage = () => {
+    this.leave();
+    window.location.href = this.getDomain();
+  }
+
   initFirebaseChat = () => {
     const chatRoomConfig = this.getChatRoomConfig();
     const database = firebase.initializeApp(chatRoomConfig.firebase, 'chat').database();
@@ -272,8 +280,9 @@ class PeerClient extends EventEmitter {
       this.consoleLog('Only teacher and student can send message');
       return;
     }
-    if (type === 'LOG' && process.env.NODE_ENV === 'development') {
+    if (type === 'LOG') {
       this.consoleLog('LOG message', content);
+      this.consoleLog('LOGGING MESSAGE IS TURNED OFF');
       return;
     }
     const chatRoomConfig = this.getChatRoomConfig();
@@ -363,6 +372,7 @@ class PeerClient extends EventEmitter {
         peer.addedStreamFlag = true;
         peer.addStream(localCameraStream);
       });
+      this.startJoin();
       return localCameraStream;
     } catch (error) {
       this.emit('error-message', I18n.t('message-cannotAccessCamera'));
@@ -390,7 +400,7 @@ class PeerClient extends EventEmitter {
     peer.receiver = receiver;
     peer.on('signal', (signal) => {
       socket.emit('rtc-signal', {
-        roomCode: this.roomCode,
+        lessonId: this.lessonId,
         sender: this.getUser(),
         receiver,
         signal,
@@ -615,13 +625,13 @@ class PeerClient extends EventEmitter {
   })
 
   leave = () => {
-    this.logAction({ action: 'OUT' });
     this.removeAllPeers();
     this.stopRecordScreen();
     this.sendMessage({
       content: `${this.getUser().full_name} left`,
       type: 'LOG',
     });
+    socket.removeAllListeners();
     socket.emit('leave');
   }
 
@@ -631,12 +641,6 @@ class PeerClient extends EventEmitter {
     if (process.env.NODE_ENV === 'development') {
       console.log(...params);
     }
-  }
-
-  logAction = ({ action = 'IN' }) => {
-    const uri = `${this.getDomain()}/api/v1/class-lecture/save-data?token=${this.getToken()}&lectureId=${this.getLessonId()}`;
-    const actualLog = JSON.stringify({ action, userId: this.getUser().user_id });
-    socket.emit('log-action', { uri, actualLog });
   }
 }
 

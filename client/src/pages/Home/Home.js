@@ -6,7 +6,7 @@ import PropTypes from 'prop-types';
 import classnames from 'classnames';
 import _ from 'lodash';
 import I18n from 'i18n-js';
-import { Button } from 'reactstrap';
+import { Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import moment from 'moment';
 import { toast } from 'react-toastify';
 import peerClient from '../../util/WebRTCClient';
@@ -51,6 +51,7 @@ class Home extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      showCameraWarningModal: true,
       ready: false,
       currentTime: null,
       endingTime: null,
@@ -70,10 +71,11 @@ class Home extends React.Component {
       const { setCurrentUser } = this.props;
       setCurrentUser(user);
     });
+    peerClient.on('language', (language) => {
+      I18n.locale = language;
+    });
     peerClient.on('join-success', ({ user, roomDetail, currentTime }) => {
       const { setRoom, setCamera, setMicrophone } = this.props;
-      const language = _.get(roomDetail, 'instance.language', 'en');
-      I18n.locale = language;
       this.setState({
         currentTime,
         endingTime: moment(roomDetail.plan_start_datetime).add(roomDetail.plan_duration, 'minute'),
@@ -155,6 +157,15 @@ class Home extends React.Component {
     });
   }
 
+  acceptCameraPermission = () => {
+    this.setState({ showCameraWarningModal: false });
+    peerClient.requestCameraStream();
+  }
+
+  denyCameraPermission = () => {
+    peerClient.backToHomePage();
+  }
+
   toggleMicrophone = () => {
     const { userConfig } = this.props;
     peerClient.enableAudio(!userConfig.microphoneOn);
@@ -219,6 +230,7 @@ class Home extends React.Component {
 
   render() {
     const {
+      showCameraWarningModal,
       ready,
       currentTime,
       endingTime,
@@ -229,6 +241,7 @@ class Home extends React.Component {
       error,
       hasPartner,
       partnerConfig,
+      currentUser,
     } = this.props;
     return (
       <div className={classnames('home-page')}>
@@ -271,6 +284,28 @@ class Home extends React.Component {
         <div className={classnames('waitting-partner-message', { 'd-none': hasPartner })}>
           <p>{I18n.t('message-waitForPartner')}</p>
         </div>
+        <Modal isOpen={currentUser && showCameraWarningModal}>
+          <ModalHeader>Camera &amp; Microphone </ModalHeader>
+          <ModalBody>
+            <pre>
+              {I18n.t('message-cameraPermissionWarning')}
+            </pre>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              color="danger"
+              onClick={this.denyCameraPermission}
+            >
+              {I18n.t('common-exit')}
+            </Button>
+            <Button
+              color="primary"
+              onClick={this.acceptCameraPermission}
+            >
+              {I18n.t('common-accept')}
+            </Button>
+          </ModalFooter>
+        </Modal>
       </div>
     );
   }

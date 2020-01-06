@@ -5,9 +5,9 @@ import delay from 'delay';
 import moment from 'moment-timezone';
 import request from 'request-promise';
 
-const checkRoom = async ({ domain, roomCode, token, role }) => {
+const checkRoom = async ({ domain, lessonId, token, role }) => {
   try {
-    const uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${roomCode}&role=${role}&token=${token}`;
+    const uri = `${domain}/api/v1/class-lecture/load-data?lectureId=${lessonId}&role=${role}&token=${token}`;
     const response = await request({
       uri,
       json: true,
@@ -36,17 +36,17 @@ const checkRoom = async ({ domain, roomCode, token, role }) => {
 const isTeacherOrStudent = (user) => (user.role && ['TEACHER', 'STUDENT'].includes(user.role));
 
 const rooms = {};
-const createRoom = (roomCode) => {
-  if (!rooms[roomCode]) {
-    rooms[roomCode] = {
+const createRoomIfNotExits = (lessonId) => {
+  if (!rooms[lessonId]) {
+    rooms[lessonId] = {
       hasTeacher: false,
       hasStudent: false,
       users: [],
     };
   }
 };
-const deleteRoom = (roomCode) => {
-  delete rooms[roomCode];
+const deleteRoom = (lessonId) => {
+  delete rooms[lessonId];
 };
 
 /**
@@ -59,9 +59,9 @@ const deleteRoom = (roomCode) => {
  *   storageConfig: Object
  * }}
  */
-const getRoom = (roomCode) => rooms[roomCode];
-const addUserToRoom = (roomCode, user) => {
-  const room = getRoom(roomCode);
+const getRoom = (lessonId) => rooms[lessonId];
+const addUserToRoom = (lessonId, user) => {
+  const room = getRoom(lessonId);
   room.users.push(user);
   if (user.role === 'TEACHER') {
     room.hasTeacher = true;
@@ -70,8 +70,8 @@ const addUserToRoom = (roomCode, user) => {
   }
 };
 
-const removeUserFromRoom = (roomCode, user) => {
-  const room = getRoom(roomCode);
+const removeUserFromRoom = (lessonId, user) => {
+  const room = getRoom(lessonId);
   if (!room) return;
   room.users = room.users.filter((x) => x.user_id !== user.user_id);
   if (user.role === 'TEACHER') {
@@ -80,43 +80,80 @@ const removeUserFromRoom = (roomCode, user) => {
     room.hasStudent = false;
   }
   if (room.users.length === 0) {
-    deleteRoom(roomCode);
+    deleteRoom(lessonId);
   }
 };
 
-const setRoomDetail = (roomCode, detail) => {
-  const room = getRoom(roomCode);
+const setRoomDetail = (lessonId, detail) => {
+  const room = getRoom(lessonId);
   room.detail = detail;
 };
 
-const setRoomStorageConfig = (roomCode, storageConfig) => {
-  const room = getRoom(roomCode);
+const setRoomStorageConfig = (lessonId, storageConfig) => {
+  const room = getRoom(lessonId);
   room.storageConfig = storageConfig;
 };
 
-const isUserJoinedRoom = (roomCode, user) => {
-  const room = getRoom(roomCode);
+const isUserJoinedRoom = (lessonId, user) => {
+  const room = getRoom(lessonId);
   if (!room) return null;
   const joinedUser = (_.find(room.users, (x) => x.user_id === user.user_id));
   return joinedUser;
+};
+
+const logUserAction = ({ domain, token, lessonId, userId, action = 'IN' }) => {
+  const uri = `${domain}/api/v1/class-lecture/save-data?token=${token}&lectureId=${lessonId}`;
+  const actualLog = JSON.stringify({ action, userId });
+  request({
+    uri,
+    method: 'POST',
+    form: {
+      actual_log: actualLog,
+    },
+  }).then((res) => console.log(res, action));
+};
+/**
+ *
+ * @param {socketIO.Server} io
+ * @param {socketIO.Socket} socket
+ */
+const socketLeave = (io, socket) => {
+  try {
+    const { lessonId, user, domain, token } = socket.data;
+    socket.data = {};
+    if (!lessonId || !user) return;
+    io.to(lessonId).emit('leave', {
+      leaverSocketId: socket.id,
+      leaverId: user.user_id,
+      leaver: user,
+    });
+    removeUserFromRoom(lessonId, user);
+    socket.leave(lessonId);
+    logUserAction({ domain, token, lessonId, action: 'OUT' });
+  } catch (e) {
+    console.log('error', e);
+  }
 };
 
 const setupSocket = (server) => {
   const io = socketIO(server);
   io.on('connection', (socket) => {
     socket.data = {};
-    socket.on('get-user-info', async ({ domain, token, roomCode, role }) => {
-      const roomData = await checkRoom({ domain, token, roomCode, role });
+    socket.on('get-user-info', async ({ domain, token, lessonId, role }) => {
+      const roomData = await checkRoom({ domain, token, lessonId, role });
+      const language = _.get(roomData, 'roomDetail.instance.language', 'en');
       const { user, error } = roomData;
       if (user) {
-        socket.emit('get-user-info', { user });
+        socket.emit('get-user-info', { user, language });
       } else {
         socket.emit('error-message', error);
       }
     });
-    socket.on('join', async ({ domain, token, roomCode, role }) => {
-      socket.data.roomCode = roomCode;
-      const roomData = await checkRoom({ domain, token, roomCode, role });
+    socket.on('join', async ({ domain, token, lessonId, role }) => {
+      socket.data.domain = domain;
+      socket.data.lessonId = lessonId;
+      socket.data.token = token;
+      const roomData = await checkRoom({ domain, token, lessonId, role });
       const {
         user,
         roomDetail,
@@ -134,28 +171,20 @@ const setupSocket = (server) => {
       user.socketId = socket.id;
 
       // close old connection of same user if exist
-      const joinedUser = isUserJoinedRoom(roomCode, user);
+      const joinedUser = isUserJoinedRoom(lessonId, user);
       if (joinedUser) {
-        io.to(roomCode).emit('leave', {
-          leaverSocketId: joinedUser.socketId,
-          leaverId: joinedUser.user_id,
-          leaver: joinedUser,
-        });
-        removeUserFromRoom(roomCode, joinedUser);
-        // clear old socket data
         const joinedSocket = io.sockets.connected[joinedUser.socketId];
-        if (joinedSocket) {
-          joinedSocket.data = {};
-        }
+        socketLeave(io, joinedSocket);
         await delay(1000);
       }
 
       socket.data.user = user;
-      socket.join(roomCode);
-      createRoom(roomCode);
-      addUserToRoom(roomCode, user);
-      setRoomDetail(roomCode, roomDetail);
-      setRoomStorageConfig(roomCode, storageConfig);
+      socket.join(lessonId);
+      createRoomIfNotExits(lessonId);
+      addUserToRoom(lessonId, user);
+      setRoomDetail(lessonId, roomDetail);
+      setRoomStorageConfig(lessonId, storageConfig);
+      logUserAction({ domain, token, lessonId, userId: user.user_id, action: 'IN' });
       socket.emit('join-success', {
         user,
         roomDetail,
@@ -166,52 +195,36 @@ const setupSocket = (server) => {
         teacher,
         student,
       });
-      const room = getRoom(roomCode);
-      io.in(roomCode).emit('make-peer', {
+      const room = getRoom(lessonId);
+      io.in(lessonId).emit('make-peer', {
         initiatorSocketId: socket.id,
         users: room.users,
       });
       if (room.hasStudent && room.hasTeacher && isTeacherOrStudent(user)) {
-        io.to(roomCode).emit('partner-joined', true);
+        io.to(lessonId).emit('partner-joined', true);
       }
     });
 
-    const leave = () => {
-      try {
-        const { roomCode, user } = socket.data;
-        socket.leave(roomCode);
-        socket.data = {};
-        if (!roomCode || !user) return;
-        io.to(roomCode).emit('leave', {
-          leaverSocketId: socket.id,
-          leaverId: user.user_id,
-          leaver: user,
-        });
-        removeUserFromRoom(roomCode, user);
-      } catch (e) {
-        console.log('error', e);
-      }
-    };
 
-    socket.on('leave', leave);
-    socket.on('disconnect', leave);
+    socket.on('leave', () => socketLeave(io, socket));
+    socket.on('disconnect', () => socketLeave(io, socket));
 
     socket.on('rtc-signal', (data) => {
-      io.to(socket.data.roomCode).emit('rtc-signal', data);
+      io.to(socket.data.lessonId).emit('rtc-signal', data);
     });
     socket.on('chat-message', (message) => {
       try {
         message.sentAt = moment().format();
         message.sender = socket.data.chatRoomConfig.sender;
-        io.in(socket.data.roomCode).emit('chat-message', message);
+        io.in(socket.data.lessonId).emit('chat-message', message);
       } catch (e) {
         console.log('error', e);
       }
     });
     socket.on('request-s3-presigned-url', ({ key }) => {
       try {
-        const { roomCode } = socket.data;
-        const room = getRoom(roomCode);
+        const { lessonId } = socket.data;
+        const room = getRoom(lessonId);
         const { storageConfig } = room;
         const s3Config = storageConfig.configs;
         const accessKeyId = s3Config.s3_key;
@@ -237,22 +250,13 @@ const setupSocket = (server) => {
       }
     });
     socket.on('turn-camera', (data) => {
-      io.to(socket.data.roomCode).emit('turn-camera', data);
+      io.to(socket.data.lessonId).emit('turn-camera', data);
     });
     socket.on('turn-microphone', (data) => {
-      io.to(socket.data.roomCode).emit('turn-microphone', data);
+      io.to(socket.data.lessonId).emit('turn-microphone', data);
     });
     socket.on('screen-stream-ended', (data) => {
-      io.to(socket.data.roomCode).emit('screen-stream-ended', data);
-    });
-    socket.on('log-action', ({ uri, actualLog }) => {
-      request({
-        uri,
-        method: 'POST',
-        form: {
-          actual_log: actualLog,
-        },
-      });
+      io.to(socket.data.lessonId).emit('screen-stream-ended', data);
     });
   });
 };

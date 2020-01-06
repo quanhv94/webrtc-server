@@ -5,6 +5,12 @@ body {
   min-height: 100vh;
 }
 
+pre {
+  font-family: inherit;
+  font-size: 100%;
+  color: inherit;
+}
+
 .disabled {
   opacity: 0.5;
   pointer-events: none;

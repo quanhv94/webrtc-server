@@ -1,6 +1,7 @@
 {
   "en": {
     "chat-pleaseTypeMessage": "Please type message...",
+    "common-accept": "Accept",
     "common-share": "Share",
     "common-record": "Record",
     "common-chat": "Chat",
@@ -17,10 +18,12 @@
     "message-loggedIn": "You logged at another browser",
     "message-cannotAccessCamera": "Can not access camera",
     "message-cannotAccessDisplay": "Can not access display",
-    "message-waitForUploadingRecord": "Recording files are being uploaded. Please wait"
+    "message-waitForUploadingRecord": "Recording files are being uploaded. Please wait",
+    "message-cameraPermissionWarning": "Website will use your camera and microphone.\nDo you agree to grant permissions?"
   },
   "vi": {
     "chat-pleaseTypeMessage": "Vui lòng nhập...",
+    "common-accept": "Đồng ý",
     "common-share": "Chia sẻ",
     "common-record": "Ghi lại",
     "common-chat": "Trò chuyện",
@@ -37,6 +40,7 @@
     "message-loggedIn": "Bạn đã đăng nhập ở một trình duyệt khác",
     "message-cannotAccessCamera": "Không thể truy cập camera",
     "message-cannotAccessDisplay": "Không thể ghi màn hình",
-    "message-waitForUploadingRecord": "File ghi hình đang được tải lên. Vui lòng chờ"
+    "message-waitForUploadingRecord": "File ghi hình đang được tải lên. Vui lòng chờ",
+    "message-cameraPermissionWarning": "Hệ thống sẽ sử dụng camera và micro của bạn.\nBạn có đồng ý cấp quyền?"
   }
 }
