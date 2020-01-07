@@ -347,12 +347,11 @@ class PeerClient extends EventEmitter {
 
   playSoundEffect = (name) => {
     this.consoleLog(`Play sound: ${name}`);
-    try {
-      const audio = new Audio();
-      audio.src = `/audio/${name}.mp3`;
-      audio.play();
-    } catch (e) {
-      console.log(e);
+    const audio = new Audio();
+    audio.src = `/audio/${name}.mp3`;
+    const audioPlayPromise = audio.play();
+    if (audioPlayPromise) {
+      audioPlayPromise.catch(console.log);
     }
   }
 
