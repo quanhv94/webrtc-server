@@ -23,7 +23,9 @@ class ToolBar extends React.Component {
 
   constructor(props) {
     super(props);
+    const { mediaDevices } = window.navigator;
     this.state = {
+      canShareScreen: !!(mediaDevices && mediaDevices.getDisplayMedia),
       isRecordingScreen: false,
       screenRecordingTime: 0,
     };
@@ -89,35 +91,39 @@ class ToolBar extends React.Component {
   }
 
   render() {
-    const { isRecordingScreen, screenRecordingTime } = this.state;
+    const { isRecordingScreen, screenRecordingTime, canShareScreen } = this.state;
     const { userConfig, currentUser } = this.props;
     if (!currentUser) return null;
     return (
       <div className="header-right">
         <Ability userRole={currentUser.role} accessibleRoles="TEACHER,STUDENT">
-          <Button
-            color="transparent"
-            className={classnames({ active: userConfig.shareScreenOn })}
-            onClick={this.toggleShareScreen}
-          >
-            <i className="icon-screen-desktop" />
-            {I18n.t('common-share')}
-          </Button>
+          {canShareScreen && (
+            <Button
+              color="transparent"
+              className={classnames({ active: userConfig.shareScreenOn })}
+              onClick={this.toggleShareScreen}
+            >
+              <i className="icon-screen-desktop" />
+              {I18n.t('common-share')}
+            </Button>
+          )}
         </Ability>
         <Ability userRole={currentUser.role} accessibleRoles="TEACHER">
-          <Button
-            color="transparent"
-            className={classnames({ active: isRecordingScreen })}
-            onClick={this.toggleRecordScreen}
-          >
-            <i className="fa fa-dot-circle-o" />
-            {I18n.t('common-record')}
-            {isRecordingScreen && (
-              <span className="small recording-time">
-                {moment().startOf('day').seconds(screenRecordingTime).format('HH:mm:ss')}
-              </span>
-            )}
-          </Button>
+          {canShareScreen && (
+            <Button
+              color="transparent"
+              className={classnames({ active: isRecordingScreen })}
+              onClick={this.toggleRecordScreen}
+            >
+              <i className="fa fa-dot-circle-o" />
+              {I18n.t('common-record')}
+              {isRecordingScreen && (
+                <span className="small recording-time">
+                  {moment().startOf('day').seconds(screenRecordingTime).format('HH:mm:ss')}
+                </span>
+              )}
+            </Button>
+          )}
         </Ability>
         <Button
           color="transparent"
